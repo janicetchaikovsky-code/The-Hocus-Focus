@@ -1,0 +1,3487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Periodic Table Meditative Study Timer</title>
+    <style>
+        /* =====================================================================
+           PURE EMBEDDED CSS (ZERO EXTERNAL DEPENDENCIES)
+           ===================================================================== */
+        :root {
+            --bg-void: #030407;
+            --bg-panel: rgba(11, 16, 27, 0.92);
+            --bg-card: rgba(18, 25, 41, 0.76);
+            --border-subtle: rgba(148, 163, 184, 0.16);
+            --border-bright: rgba(56, 189, 248, 0.48);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --text-dim: #64748b;
+            --accent: #38bdf8;
+            --emerald: #34d399;
+            --amber: #fbbf24;
+            --rose: #fb7185;
+            --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            background-color: var(--bg-void);
+            color: var(--text-main);
+            font-family: var(--font-sans);
+            overflow: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* Ensure background canvas NEVER blocks UI clicks */
+        canvas#atomCanvas {
+            position: fixed;
+            inset: 0;
+            display: block;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .mono {
+            font-family: var(--font-mono);
+        }
+
+        /* Animations */
+        @keyframes subtlePulse {
+            0%, 100% { opacity: 0.9; transform: scale(1); }
+            50% { opacity: 0.35; transform: scale(0.85); }
+        }
+        .pulse-dot {
+            animation: subtlePulse 2.2s infinite ease-in-out;
+        }
+
+        @keyframes petFloat {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-5px) rotate(1.5deg); }
+        }
+        .pet-float {
+            animation: petFloat 4.2s infinite ease-in-out;
+        }
+
+        @keyframes petBounce {
+            0% { transform: scale(1) translateY(0); }
+            30% { transform: scale(1.18) translateY(-12px) rotate(-4deg); }
+            65% { transform: scale(1.06) translateY(-4px) rotate(3deg); }
+            100% { transform: scale(1) translateY(0) rotate(0deg); }
+        }
+        .pet-bounce {
+            animation: petBounce 0.72s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        @keyframes crumbFly {
+            0% { opacity: 1; transform: translate(0, 0) scale(1); }
+            100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(0.3); }
+        }
+        .cheese-crumb {
+            position: fixed;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #fde047;
+            pointer-events: none;
+            z-index: 65;
+            animation: crumbFly 0.65s ease-out forwards;
+        }
+
+        /* Top-Left Element & Session HUD */
+        #topHud {
+            position: fixed;
+            top: 22px;
+            left: 24px;
+            z-index: 10;
+            pointer-events: none;
+            opacity: 0.9;
+            transition: opacity 0.4s ease;
+        }
+
+        .category-row {
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: var(--text-muted);
+        }
+
+        #statusDot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background-color: var(--accent);
+            display: inline-block;
+        }
+
+        .shells-row {
+            margin-top: 4px;
+            font-size: 11px;
+            color: var(--text-dim);
+            display: flex;
+            gap: 6px;
+        }
+        .shells-row span#shellsDisplay {
+            color: #cbd5e1;
+            font-weight: 500;
+        }
+
+        .stats-pills {
+            margin-top: 12px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .stat-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 10px;
+            border-radius: 10px;
+            background: rgba(15, 23, 42, 0.62);
+            border: 1px solid var(--border-subtle);
+            backdrop-filter: blur(8px);
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+        .stat-pill strong {
+            color: var(--text-main);
+            font-weight: 600;
+        }
+
+        /* Top-Right Action Buttons */
+        #topActions {
+            position: fixed;
+            top: 22px;
+            right: 24px;
+            z-index: 20;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            opacity: 0.85;
+            transition: opacity 0.35s ease;
+        }
+        #topActions:hover, #topActions:focus-within {
+            opacity: 1;
+        }
+
+        .pill-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            padding: 8px 13px;
+            border-radius: 12px;
+            background: rgba(15, 23, 42, 0.72);
+            border: 1px solid var(--border-subtle);
+            backdrop-filter: blur(10px);
+            color: var(--text-main);
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s, border-color 0.2s, transform 0.12s;
+        }
+        .pill-btn:hover {
+            background: rgba(30, 41, 59, 0.94);
+            border-color: rgba(148, 163, 184, 0.38);
+        }
+        .pill-btn:active {
+            transform: scale(0.96);
+        }
+        .pill-btn.icon-only {
+            padding: 8px 10px;
+            color: var(--text-muted);
+        }
+        .pill-btn.icon-only:hover {
+            color: var(--text-main);
+        }
+
+        /* =====================================================================
+           INDEPENDENT DRAGGABLE PET ENTITIES & CHEESE PLATTER
+           ===================================================================== */
+        #petsLayer {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 15;
+        }
+
+        .draggable-pet-entity {
+            position: fixed;
+            pointer-events: auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            touch-action: none;
+            cursor: grab;
+            z-index: 16;
+        }
+        .draggable-pet-entity.dragging {
+            cursor: grabbing;
+            z-index: 35;
+        }
+
+        .pet-speech-bubble {
+            margin-bottom: 5px;
+            padding: 5px 11px;
+            border-radius: 999px;
+            background: rgba(15, 23, 42, 0.95);
+            border: 1px solid rgba(56, 189, 248, 0.42);
+            color: #bae6fd;
+            font-size: 11px;
+            white-space: nowrap;
+            pointer-events: none;
+            opacity: 0;
+            transform: translateY(4px);
+            transition: opacity 0.25s ease, transform 0.25s ease;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
+        }
+        .pet-speech-bubble.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .pet-sprite-box {
+            width: 82px;
+            height: 68px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            filter: drop-shadow(0 0 14px rgba(56, 189, 248, 0.24));
+            transition: transform 0.15s ease;
+        }
+        .draggable-pet-entity.dragging .pet-sprite-box {
+            transform: scale(1.09);
+            filter: drop-shadow(0 12px 24px rgba(56, 189, 248, 0.45));
+        }
+
+        .pet-name-tag {
+            margin-top: 2px;
+            font-size: 10px;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-dim);
+            background: rgba(3, 4, 7, 0.72);
+            padding: 1px 6px;
+            border-radius: 6px;
+            opacity: 0;
+            transform: translateY(-3px);
+            pointer-events: none;
+            transition: opacity 0.25s ease, transform 0.25s ease;
+        }
+        .pet-name-tag.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Silver Edible Cheese Platter */
+        #cheesePlatterStage {
+            position: fixed;
+            left: 28px;
+            top: calc(100vh - 76px);
+            z-index: 14;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            touch-action: none;
+            cursor: grab;
+        }
+        #cheesePlatterStage.has-cheese {
+            display: flex;
+        }
+        #cheesePlatterStage.dragging {
+            cursor: grabbing;
+            z-index: 34;
+        }
+
+        .cheese-items-row {
+            display: flex;
+            align-items: flex-end;
+            gap: 4px;
+            padding: 0 7px;
+            margin-bottom: -3px;
+            z-index: 2;
+        }
+
+        .cheese-chip {
+            position: relative;
+            width: 30px;
+            height: 30px;
+            border-radius: 8px;
+            background: rgba(30, 41, 59, 0.9);
+            border: 1px solid rgba(251, 191, 36, 0.45);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: transform 0.15s ease, border-color 0.2s, background 0.2s;
+        }
+        .cheese-chip:hover {
+            transform: translateY(-4px) scale(1.13);
+            border-color: #fde047;
+            background: rgba(51, 65, 85, 0.96);
+        }
+        .cheese-chip svg {
+            width: 20px;
+            height: 20px;
+        }
+        .cheese-count-badge {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            min-width: 15px;
+            height: 15px;
+            padding: 0 3px;
+            border-radius: 999px;
+            background: #f59e0b;
+            color: #090d16;
+            font-size: 9px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1;
+        }
+
+        .platter-dish {
+            width: 100%;
+            min-width: 54px;
+            height: 7px;
+            border-radius: 2px 2px 10px 10px;
+            background: linear-gradient(180deg, #e2e8f0 0%, #94a3b8 60%, #475569 100%);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.65);
+        }
+
+        /* Floating Toast Banner */
+        #toastBanner {
+            position: fixed;
+            top: 74px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-6px);
+            z-index: 55;
+            padding: 8px 16px;
+            border-radius: 999px;
+            background: rgba(15, 23, 42, 0.95);
+            border: 1px solid rgba(56, 189, 248, 0.4);
+            color: #e0f2fe;
+            font-size: 12px;
+            font-weight: 500;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.35s ease, transform 0.35s ease;
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.55);
+            white-space: nowrap;
+        }
+        #toastBanner.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+        #toastBanner.cheese-toast {
+            border-color: rgba(251, 191, 36, 0.55);
+            color: #fef3c7;
+        }
+
+        /* Bottom-Right Low-Opacity Control Dock */
+        #controlsDock {
+            position: fixed;
+            bottom: 22px;
+            right: 24px;
+            z-index: 20;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 5px;
+            padding: 6px;
+            border-radius: 16px;
+            background: rgba(15, 23, 42, 0.64);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border-subtle);
+            opacity: 0.62;
+            transition: opacity 0.4s ease;
+            box-shadow: 0 16px 36px rgba(0, 0, 0, 0.5);
+        }
+        #controlsDock:hover, #controlsDock:focus-within {
+            opacity: 1;
+        }
+
+        .dock-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            padding: 8px;
+            border-radius: 11px;
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            font-size: 11px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.18s, color 0.18s, transform 0.1s;
+        }
+        .dock-btn:hover {
+            background: rgba(30, 41, 59, 0.85);
+            color: var(--text-main);
+        }
+        .dock-btn:active {
+            transform: scale(0.94);
+        }
+        .dock-btn.primary-toggle {
+            background: rgba(30, 41, 59, 0.78);
+            color: var(--text-main);
+        }
+        .dock-btn.text-pill {
+            padding: 7px 10px;
+        }
+        .dock-btn.log-btn {
+            color: var(--emerald);
+        }
+        .dock-btn.log-btn:hover {
+            background: rgba(16, 185, 129, 0.16);
+            color: #6ee7b7;
+        }
+
+        .dock-divider {
+            width: 1px;
+            height: 16px;
+            background: rgba(148, 163, 184, 0.16);
+            margin: 0 2px;
+        }
+
+        #timerText {
+            padding: 6px 10px;
+            border-radius: 10px;
+            background: rgba(3, 4, 7, 0.75);
+            border: 1px solid var(--border-subtle);
+            font-size: 11px;
+            color: #cbd5e1;
+            min-width: 54px;
+            text-align: center;
+        }
+
+        /* =====================================================================
+           SLIDE-OVER DRAWERS & MODALS
+           ===================================================================== */
+        .backdrop {
+            position: fixed;
+            inset: 0;
+            z-index: 40;
+            background: rgba(2, 4, 9, 0.72);
+            backdrop-filter: blur(4px);
+            display: none;
+            opacity: 0;
+            transition: opacity 0.25s ease;
+        }
+        .backdrop.open {
+            display: block;
+            opacity: 1;
+        }
+
+        .side-drawer {
+            position: fixed;
+            top: 0;
+            right: 0;
+            z-index: 50;
+            width: 100%;
+            max-width: 470px;
+            height: 100%;
+            background: #080c14;
+            border-left: 1px solid var(--border-subtle);
+            box-shadow: -20px 0 50px rgba(0, 0, 0, 0.8);
+            transform: translateX(100%);
+            transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+            display: flex;
+            flex-direction: column;
+        }
+        .side-drawer.open {
+            transform: translateX(0);
+        }
+
+        .drawer-header {
+            padding: 20px 22px;
+            border-bottom: 1px solid var(--border-subtle);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+        .drawer-header h2 {
+            font-size: 16px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .drawer-header p {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 3px;
+        }
+
+        .drawer-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px 22px;
+            display: flex;
+            flex-direction: column;
+            gap: 22px;
+        }
+
+        .drawer-body::-webkit-scrollbar,
+        .modal-body::-webkit-scrollbar {
+            width: 5px;
+        }
+        .drawer-body::-webkit-scrollbar-thumb,
+        .modal-body::-webkit-scrollbar-thumb {
+            background: rgba(100, 116, 139, 0.35);
+            border-radius: 999px;
+        }
+
+        .section-title {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-muted);
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .shop-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .shop-card {
+            padding: 13px 14px;
+            border-radius: 14px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            transition: border-color 0.2s, background 0.2s;
+        }
+        .shop-card.active-card {
+            background: rgba(14, 116, 144, 0.18);
+            border-color: var(--border-bright);
+        }
+
+        .shop-card-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .shop-card-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 0;
+        }
+
+        .shop-pet-thumb {
+            width: 56px;
+            height: 46px;
+            flex-shrink: 0;
+            border-radius: 11px;
+            background: rgba(3, 4, 7, 0.8);
+            border: 1px solid var(--border-subtle);
+            padding: 3px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .theme-swatch {
+            width: 28px;
+            height: 28px;
+            flex-shrink: 0;
+            border-radius: 50%;
+            border: 2px solid rgba(255, 255, 255, 0.24);
+        }
+
+        .shop-item-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-main);
+        }
+        .shop-item-desc {
+            font-size: 11px;
+            color: var(--text-muted);
+            line-height: 1.4;
+            margin-top: 2px;
+        }
+
+        /* Per-Pet Color Swatch Selector Bar */
+        .pet-swatches-bar {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 6px;
+            padding-top: 8px;
+            border-top: 1px solid rgba(148, 163, 184, 0.12);
+        }
+        .swatch-label {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--text-dim);
+            margin-right: 4px;
+        }
+        .pet-color-dot {
+            position: relative;
+            width: 19px;
+            height: 19px;
+            border-radius: 50%;
+            border: 2px solid rgba(255, 255, 255, 0.22);
+            cursor: pointer;
+            transition: transform 0.14s ease, border-color 0.14s ease;
+        }
+        .pet-color-dot:hover {
+            transform: scale(1.18);
+        }
+        .pet-color-dot.selected {
+            border-color: #ffffff;
+            transform: scale(1.22);
+            box-shadow: 0 0 8px rgba(255, 255, 255, 0.65);
+        }
+        .pet-color-dot.owned::after {
+            content: "";
+            position: absolute;
+            bottom: -4px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 4px;
+            height: 4px;
+            border-radius: 50%;
+            background: #38bdf8;
+        }
+        .pet-color-dot.equipped-dot::after {
+            background: #34d399;
+            box-shadow: 0 0 4px #34d399;
+        }
+
+        .shop-action-btn {
+            flex-shrink: 0;
+            padding: 7px 12px;
+            border-radius: 10px;
+            font-size: 11px;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            transition: transform 0.1s, opacity 0.2s;
+        }
+        .shop-action-btn:active {
+            transform: scale(0.95);
+        }
+        .shop-action-btn.buy {
+            background: var(--accent);
+            color: #030407;
+        }
+        .shop-action-btn.locked {
+            background: rgba(30, 41, 59, 0.85);
+            color: var(--text-dim);
+            cursor: not-allowed;
+        }
+        .shop-action-btn.equip {
+            background: rgba(30, 41, 59, 0.95);
+            color: var(--text-main);
+            border: 1px solid var(--border-subtle);
+        }
+        .shop-action-btn.equipped {
+            background: rgba(16, 185, 129, 0.18);
+            color: #6ee7b7;
+            border: 1px solid rgba(16, 185, 129, 0.42);
+        }
+
+        /* Centered Modal (Student Edit & Recovery) */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 55;
+            background: rgba(2, 4, 9, 0.76);
+            backdrop-filter: blur(5px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+        }
+        .modal-overlay.open {
+            display: flex;
+        }
+
+        .modal-box {
+            width: 100%;
+            max-width: 540px;
+            border-radius: 18px;
+            background: #0a0f1a;
+            border: 1px solid var(--border-subtle);
+            box-shadow: 0 24px 60px rgba(0, 0, 0, 0.82);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            max-height: 88vh;
+        }
+
+        .modal-body {
+            padding: 20px 22px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .notice-box {
+            padding: 11px 13px;
+            border-radius: 12px;
+            background: rgba(245, 158, 11, 0.1);
+            border: 1px solid rgba(245, 158, 11, 0.28);
+            font-size: 12px;
+            color: #fde68a;
+            line-height: 1.45;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+        @media (max-width: 480px) {
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .field-label {
+            display: block;
+            font-size: 12px;
+            font-weight: 500;
+            color: #cbd5e1;
+            margin-bottom: 6px;
+        }
+
+        .field-input, .field-select {
+            width: 100%;
+            padding: 9px 12px;
+            border-radius: 10px;
+            background: #0f172a;
+            border: 1px solid rgba(148, 163, 184, 0.25);
+            color: var(--text-main);
+            font-size: 13px;
+            outline: none;
+        }
+        .field-input:focus, .field-select:focus {
+            border-color: var(--accent);
+        }
+
+        .checkbox-row {
+            margin-top: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            color: var(--text-muted);
+            cursor: pointer;
+        }
+
+        .unlocks-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+        @media (max-width: 480px) {
+            .unlocks-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .unlock-check-card {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 10px;
+            border-radius: 10px;
+            background: rgba(15, 23, 42, 0.75);
+            border: 1px solid var(--border-subtle);
+            font-size: 11px;
+            color: #cbd5e1;
+            cursor: pointer;
+        }
+
+        .cheese-recovery-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .modal-footer {
+            padding: 14px 22px;
+            background: rgba(3, 4, 7, 0.65);
+            border-top: 1px solid var(--border-subtle);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+
+        /* Study Session Log Specific Styles */
+        .summary-banner {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+        }
+        .summary-stat {
+            padding: 10px;
+            border-radius: 12px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            text-align: center;
+        }
+        .summary-stat .val {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+        .summary-stat .lbl {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        .active-session-box {
+            padding: 14px;
+            border-radius: 14px;
+            background: rgba(16, 185, 129, 0.08);
+            border: 1px solid rgba(16, 185, 129, 0.28);
+        }
+
+        .session-log-card {
+            padding: 13px 14px;
+            border-radius: 14px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            display: flex;
+            flex-direction: column;
+            gap: 7px;
+        }
+        .session-log-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+        .session-date {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+        .session-badges {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            font-size: 11px;
+        }
+        .s-badge {
+            padding: 3px 8px;
+            border-radius: 7px;
+            background: rgba(3, 4, 7, 0.55);
+            border: 1px solid var(--border-subtle);
+            color: #e2e8f0;
+        }
+        .session-note-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 2px;
+        }
+        .session-note-input {
+            flex: 1;
+            background: rgba(3, 4, 7, 0.45);
+            border: 1px solid rgba(148, 163, 184, 0.16);
+            border-radius: 8px;
+            padding: 5px 9px;
+            font-size: 11px;
+            color: #cbd5e1;
+            outline: none;
+        }
+        .session-note-input:focus {
+            border-color: var(--accent);
+        }
+        .delete-entry-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-dim);
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 6px;
+        }
+        .delete-entry-btn:hover {
+            color: var(--rose);
+            background: rgba(244, 63, 94, 0.12);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Fullscreen Atom Canvas (pointer-events: none so it never blocks clicks) -->
+    <canvas id="atomCanvas"></canvas>
+
+    <!-- Minimalist Top-Left Element & Session HUD -->
+    <div id="topHud">
+        <div class="category-row">
+            <span id="statusDot" class="pulse-dot"></span>
+            <span id="categoryLabel">Reactive Nonmetal</span>
+        </div>
+        <div class="shells-row mono">
+            <span>SHELLS:</span>
+            <span id="shellsDisplay">1</span>
+        </div>
+        <div class="stats-pills mono">
+            <div class="stat-pill" title="Earn +5 base Quanta +2 discovery bonus every study minute">
+                <span style="color:#38bdf8;">✦</span>
+                <strong id="hudQuanta">15</strong>
+                <span>Quanta</span>
+            </div>
+            <div class="stat-pill">
+                <span style="color:#34d399;">◷</span>
+                <strong id="hudMinutes">0</strong>
+                <span>min</span>
+            </div>
+            <div class="stat-pill" title="Current active study session">
+                <span style="color:#fbbf24;">●</span>
+                <strong id="hudSessionMins">0m</strong>
+                <span>session</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Top-Right Action Pills (Study Log, Lab Shop, Student Recovery Edit) -->
+    <div id="topActions">
+        <button id="openLogBtn" class="pill-btn" title="View Recorded Study Sessions">
+            <svg width="14" height="14" fill="none" stroke="#34d399" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+            </svg>
+            <span>Study Log</span>
+        </button>
+
+        <button id="openShopBtn" class="pill-btn">
+            <span style="color:#38bdf8;">✦</span>
+            <span>Lab Shop</span>
+        </button>
+
+        <button id="openEditBtn" class="pill-btn icon-only" title="Student Edit & Progress Recovery Mode" aria-label="Edit Progress">
+            <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+            </svg>
+        </button>
+    </div>
+
+    <!-- Container for Multiple Independently Draggable Screen Pets -->
+    <div id="petsLayer"></div>
+
+    <!-- Silver Edible Cheese Platter (1 Random Cheese Awarded Every 5 Mins) -->
+    <div id="cheesePlatterStage" title="Click any cheese wedge to eat it! Drag platter to move.">
+        <div id="cheeseItemsRow" class="cheese-items-row"></div>
+        <div class="platter-dish"></div>
+    </div>
+
+    <!-- Floating Toast Notification -->
+    <div id="toastBanner">Element Discovered! +7 Quanta</div>
+
+    <!-- Unobtrusive Bottom-Right Study Controls -->
+    <div id="controlsDock">
+        <!-- Ambient Audio Toggle -->
+        <button id="audioToggleBtn" class="dock-btn" title="Toggle Meditative Ambient Soundscape" aria-label="Toggle Ambient Sound">
+            <svg id="audioMutedIcon" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/>
+                <path stroke-linecap="round" stroke-linejoin="round" d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"/>
+            </svg>
+            <svg id="audioOnIcon" class="hidden" width="16" height="16" fill="none" stroke="#38bdf8" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/>
+            </svg>
+        </button>
+
+        <div class="dock-divider"></div>
+
+        <!-- Previous Element -->
+        <button id="prevBtn" class="dock-btn" title="Previous Element (Left Arrow)" aria-label="Previous Element">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
+            </svg>
+        </button>
+
+        <!-- Play / Pause -->
+        <button id="playPauseBtn" class="dock-btn primary-toggle" title="Pause / Resume Timer (Space)" aria-label="Pause or Resume">
+            <svg id="pauseIcon" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M10 9v6m4-6v6"/>
+            </svg>
+            <svg id="playIcon" class="hidden" width="16" height="16" fill="none" stroke="#34d399" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
+            </svg>
+        </button>
+
+        <!-- Next Element -->
+        <button id="nextBtn" class="dock-btn" title="Next Element (Right Arrow)" aria-label="Next Element">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+            </svg>
+        </button>
+
+        <!-- Log Current Session Button -->
+        <button id="logSessionDockBtn" class="dock-btn text-pill log-btn mono" title="Save current study session to Study Log and start a fresh session">
+            <span>✓ Log Session</span>
+        </button>
+
+        <!-- Reset Current Session -->
+        <button id="resetSessionBtn" class="dock-btn" title="Reset Atom Session to Hydrogen (H)" aria-label="Reset Session">
+            <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+            </svg>
+        </button>
+
+        <div class="dock-divider"></div>
+
+        <!-- Speed Toggle (60s Study Mode vs 1s Fast Preview) -->
+        <button id="speedBtn" class="dock-btn text-pill mono" title="Toggle Interval Speed (60s Study Mode vs 1s Fast Preview)">
+            <span id="speedLabel">60s / elem</span>
+        </button>
+
+        <!-- Countdown Readout -->
+        <div id="timerText" class="mono" title="Time until next element">01:00</div>
+    </div>
+
+    <!-- =====================================================================
+         SLIDE-OVER QUANTUM LAB SHOP DRAWER
+         ===================================================================== -->
+    <div id="drawerBackdrop" class="backdrop"></div>
+
+    <aside id="shopDrawer" class="side-drawer" aria-label="Quantum Lab Shop">
+        <div class="drawer-header">
+            <div>
+                <h2><span style="color:#38bdf8;">✦</span> Quantum Lab Shop</h2>
+                <p>+7 Quanta/min (5 base + 2 bonus) · 1 random cheese every 5 mins!</p>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;">
+                <div class="stat-pill mono" style="border-color:rgba(56,189,248,0.35);color:#7dd3fc;">
+                    ✦ <strong id="shopQuantaBalance">15</strong>
+                </div>
+                <button id="closeShopBtn" class="dock-btn" aria-label="Close Shop">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <div class="drawer-body">
+            <div>
+                <div class="section-title">
+                    <span>Derpy Oval-Blob Pets (Equip Multiple Color Variants!)</span>
+                    <span id="equippedCountBadge" class="mono" style="color:#34d399;">0 Equipped</span>
+                </div>
+                <div id="shopPetsList" class="shop-list"></div>
+            </div>
+
+            <div>
+                <div class="section-title">Lab Upgrades & Soundscapes</div>
+                <div id="shopUpgradesList" class="shop-list"></div>
+            </div>
+
+            <div>
+                <div class="section-title">14 Chromatic & Ambient Color Themes</div>
+                <div id="shopThemesList" class="shop-list"></div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- =====================================================================
+         SLIDE-OVER STUDY SESSION RECORDER & HISTORY LOG DRAWER
+         ===================================================================== -->
+    <aside id="logDrawer" class="side-drawer" aria-label="Study Session Log">
+        <div class="drawer-header">
+            <div>
+                <h2><span style="color:#34d399;">◷</span> Study Session Log</h2>
+                <p>Automatic session tracker & recorded study history</p>
+            </div>
+            <button id="closeLogBtn" class="dock-btn" aria-label="Close Study Log">
+                <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
+        </div>
+
+        <div class="drawer-body">
+            <!-- All-Time Summary Stats -->
+            <div class="summary-banner mono">
+                <div class="summary-stat">
+                    <div id="logTotalMins" class="val" style="color:#38bdf8;">0</div>
+                    <div class="lbl">Total Mins</div>
+                </div>
+                <div class="summary-stat">
+                    <div id="logTotalSessions" class="val" style="color:#34d399;">0</div>
+                    <div class="lbl">Sessions</div>
+                </div>
+                <div class="summary-stat">
+                    <div id="logTotalCheeses" class="val" style="color:#fbbf24;">0</div>
+                    <div class="lbl">Cheeses Won</div>
+                </div>
+            </div>
+
+            <!-- Live Current Session Card -->
+            <div class="active-session-box">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;">
+                    <span style="font-size:12px;font-weight:600;color:#6ee7b7;">● Current Active Session</span>
+                    <span id="liveSessionStartLabel" class="mono" style="font-size:11px;color:#94a3b8;">Started just now</span>
+                </div>
+                <div id="liveSessionStats" class="mono" style="font-size:12px;color:#e2e8f0;margin-bottom:10px;">
+                    0 mins · H → H · +0 ✦ · 0 cheeses
+                </div>
+                <div style="display:flex;gap:8px;">
+                    <input id="activeSessionNoteInput" type="text" placeholder="Add subject tag or note (e.g. Organic Chem)..." class="session-note-input" style="background:rgba(3,4,7,0.65);">
+                    <button id="drawerLogSessionBtn" class="shop-action-btn buy" style="background:#34d399;">
+                        Save & End
+                    </button>
+                </div>
+            </div>
+
+            <!-- Past Recorded Sessions List -->
+            <div>
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+                    <div class="section-title" style="margin-bottom:0;">Recorded Sessions</div>
+                    <button id="clearHistoryBtn" style="background:none;border:none;color:#64748b;font-size:11px;cursor:pointer;">Clear History</button>
+                </div>
+                <div id="sessionHistoryList" class="shop-list"></div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- =====================================================================
+         STUDENT EDIT & PROGRESS RECOVERY MODAL
+         ===================================================================== -->
+    <div id="editModal" class="modal-overlay" role="dialog" aria-modal="true" aria-label="Student Recovery Mode">
+        <div class="modal-box">
+            <div class="drawer-header">
+                <div>
+                    <h2>Student Edit & Progress Recovery</h2>
+                    <p>Restore lost minutes, Quanta, pets, or cheeses anytime</p>
+                </div>
+                <button id="closeEditBtn" class="dock-btn" aria-label="Close Edit Modal">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+
+            <div class="modal-body">
+                <div class="notice-box">
+                    <strong>Progress Recovery Protection:</strong> Your stats, pet placements, colors, cheeses, and study logs save automatically in this browser. Use these controls to restore any lost progress.
+                </div>
+
+                <div class="form-grid">
+                    <div>
+                        <label for="editMinutesInput" class="field-label">Total Study Minutes Spent</label>
+                        <input id="editMinutesInput" type="number" min="0" max="999999" class="field-input mono">
+                    </div>
+                    <div>
+                        <label for="editQuantaInput" class="field-label">Quanta Balance (✦)</label>
+                        <input id="editQuantaInput" type="number" min="0" max="9999999" class="field-input mono">
+                    </div>
+                </div>
+
+                <div>
+                    <label for="editElementSelect" class="field-label">Active Periodic Table Element (1–118)</label>
+                    <select id="editElementSelect" class="field-select"></select>
+                    <label class="checkbox-row">
+                        <input id="syncElementWithMinutes" type="checkbox">
+                        <span>Auto-match element to Total Study Minutes (1 min = He, etc.)</span>
+                    </label>
+                </div>
+
+                <div>
+                    <label class="field-label">Cheese Platter Recovery</label>
+                    <div class="cheese-recovery-row">
+                        <button type="button" id="addRandomCheeseRecoveryBtn" class="shop-action-btn equip" style="border-color:rgba(251,191,36,0.4);color:#fde047;">
+                            + Add 1 Random Cheese 🧀
+                        </button>
+                        <button type="button" id="clearCheesesRecoveryBtn" class="shop-action-btn equip">
+                            Clear Platter
+                        </button>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="field-label">Unlock / Reset Shop Items & Pets</label>
+                    <div id="editUnlocksGrid" class="unlocks-grid"></div>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button id="factoryResetBtn" class="shop-action-btn" style="background:rgba(244,63,94,0.14);color:#fda4af;border:1px solid rgba(244,63,94,0.35);">
+                    Reset All Data
+                </button>
+                <div style="display:flex;gap:8px;">
+                    <button id="cancelEditBtn" class="shop-action-btn equip">Cancel</button>
+                    <button id="saveEditBtn" class="shop-action-btn buy">Apply & Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /* =====================================================================
+           1. COMPLETE PERIODIC TABLE DATA (1 H THROUGH 118 Og)
+           ===================================================================== */
+        const CATEGORY_THEMES = {
+            "nonmetal":         { label: "Reactive Nonmetal",     primary: "#38bdf8", glow: "rgba(56, 189, 248, 0.55)" },
+            "noble-gas":        { label: "Noble Gas",             primary: "#e879f9", glow: "rgba(232, 121, 249, 0.55)" },
+            "alkali-metal":     { label: "Alkali Metal",          primary: "#fb7185", glow: "rgba(251, 113, 133, 0.55)" },
+            "alkaline-earth":   { label: "Alkaline Earth Metal",  primary: "#fbbf24", glow: "rgba(251, 191, 36, 0.55)" },
+            "metalloid":        { label: "Metalloid",             primary: "#34d399", glow: "rgba(52, 211, 153, 0.55)" },
+            "post-transition":  { label: "Post-Transition Metal", primary: "#60a5fa", glow: "rgba(96, 165, 250, 0.55)" },
+            "transition-metal": { label: "Transition Metal",      primary: "#fb923c", glow: "rgba(251, 146, 60, 0.55)" },
+            "lanthanide":       { label: "Lanthanide",            primary: "#f472b6", glow: "rgba(244, 114, 182, 0.55)" },
+            "actinide":         { label: "Actinide",              primary: "#a78bfa", glow: "rgba(167, 139, 250, 0.55)" },
+            "unknown":          { label: "Unknown Properties",    primary: "#94a3b8", glow: "rgba(148, 163, 184, 0.55)" }
+        };
+
+        const ELEMENTS = [
+            [1, "H", "Hydrogen", "nonmetal", [1]],
+            [2, "He", "Helium", "noble-gas", [2]],
+            [3, "Li", "Lithium", "alkali-metal", [2, 1]],
+            [4, "Be", "Beryllium", "alkaline-earth", [2, 2]],
+            [5, "B", "Boron", "metalloid", [2, 3]],
+            [6, "C", "Carbon", "nonmetal", [2, 4]],
+            [7, "N", "Nitrogen", "nonmetal", [2, 5]],
+            [8, "O", "Oxygen", "nonmetal", [2, 6]],
+            [9, "F", "Fluorine", "nonmetal", [2, 7]],
+            [10, "Ne", "Neon", "noble-gas", [2, 8]],
+            [11, "Na", "Sodium", "alkali-metal", [2, 8, 1]],
+            [12, "Mg", "Magnesium", "alkaline-earth", [2, 8, 2]],
+            [13, "Al", "Aluminium", "post-transition", [2, 8, 3]],
+            [14, "Si", "Silicon", "metalloid", [2, 8, 4]],
+            [15, "P", "Phosphorus", "nonmetal", [2, 8, 5]],
+            [16, "S", "Sulfur", "nonmetal", [2, 8, 6]],
+            [17, "Cl", "Chlorine", "nonmetal", [2, 8, 7]],
+            [18, "Ar", "Argon", "noble-gas", [2, 8, 8]],
+            [19, "K", "Potassium", "alkali-metal", [2, 8, 8, 1]],
+            [20, "Ca", "Calcium", "alkaline-earth", [2, 8, 8, 2]],
+            [21, "Sc", "Scandium", "transition-metal", [2, 8, 9, 2]],
+            [22, "Ti", "Titanium", "transition-metal", [2, 8, 10, 2]],
+            [23, "V", "Vanadium", "transition-metal", [2, 8, 11, 2]],
+            [24, "Cr", "Chromium", "transition-metal", [2, 8, 13, 1]],
+            [25, "Mn", "Manganese", "transition-metal", [2, 8, 13, 2]],
+            [26, "Fe", "Iron", "transition-metal", [2, 8, 14, 2]],
+            [27, "Co", "Cobalt", "transition-metal", [2, 8, 15, 2]],
+            [28, "Ni", "Nickel", "transition-metal", [2, 8, 16, 2]],
+            [29, "Cu", "Copper", "transition-metal", [2, 8, 18, 1]],
+            [30, "Zn", "Zinc", "transition-metal", [2, 8, 18, 2]],
+            [31, "Ga", "Gallium", "post-transition", [2, 8, 18, 3]],
+            [32, "Ge", "Germanium", "metalloid", [2, 8, 18, 4]],
+            [33, "As", "Arsenic", "metalloid", [2, 8, 18, 5]],
+            [34, "Se", "Selenium", "nonmetal", [2, 8, 18, 6]],
+            [35, "Br", "Bromine", "nonmetal", [2, 8, 18, 7]],
+            [36, "Kr", "Krypton", "noble-gas", [2, 8, 18, 8]],
+            [37, "Rb", "Rubidium", "alkali-metal", [2, 8, 18, 8, 1]],
+            [38, "Sr", "Strontium", "alkaline-earth", [2, 8, 18, 8, 2]],
+            [39, "Y", "Yttrium", "transition-metal", [2, 8, 18, 9, 2]],
+            [40, "Zr", "Zirconium", "transition-metal", [2, 8, 18, 10, 2]],
+            [41, "Nb", "Niobium", "transition-metal", [2, 8, 18, 12, 1]],
+            [42, "Mo", "Molybdenum", "transition-metal", [2, 8, 18, 13, 1]],
+            [43, "Tc", "Technetium", "transition-metal", [2, 8, 18, 13, 2]],
+            [44, "Ru", "Ruthenium", "transition-metal", [2, 8, 18, 15, 1]],
+            [45, "Rh", "Rhodium", "transition-metal", [2, 8, 18, 16, 1]],
+            [46, "Pd", "Palladium", "transition-metal", [2, 8, 18, 18]],
+            [47, "Ag", "Silver", "transition-metal", [2, 8, 18, 18, 1]],
+            [48, "Cd", "Cadmium", "transition-metal", [2, 8, 18, 18, 2]],
+            [49, "In", "Indium", "post-transition", [2, 8, 18, 18, 3]],
+            [50, "Sn", "Tin", "post-transition", [2, 8, 18, 18, 4]],
+            [51, "Sb", "Antimony", "metalloid", [2, 8, 18, 18, 5]],
+            [52, "Te", "Tellurium", "metalloid", [2, 8, 18, 18, 6]],
+            [53, "I", "Iodine", "nonmetal", [2, 8, 18, 18, 7]],
+            [54, "Xe", "Xenon", "noble-gas", [2, 8, 18, 18, 8]],
+            [55, "Cs", "Caesium", "alkali-metal", [2, 8, 18, 18, 8, 1]],
+            [56, "Ba", "Barium", "alkaline-earth", [2, 8, 18, 18, 8, 2]],
+            [57, "La", "Lanthanum", "lanthanide", [2, 8, 18, 18, 9, 2]],
+            [58, "Ce", "Cerium", "lanthanide", [2, 8, 18, 19, 9, 2]],
+            [59, "Pr", "Praseodymium", "lanthanide", [2, 8, 18, 21, 8, 2]],
+            [60, "Nd", "Neodymium", "lanthanide", [2, 8, 18, 22, 8, 2]],
+            [61, "Pm", "Promethium", "lanthanide", [2, 8, 18, 23, 8, 2]],
+            [62, "Sm", "Samarium", "lanthanide", [2, 8, 18, 24, 8, 2]],
+            [63, "Eu", "Europium", "lanthanide", [2, 8, 18, 25, 8, 2]],
+            [64, "Gd", "Gadolinium", "lanthanide", [2, 8, 18, 25, 9, 2]],
+            [65, "Tb", "Terbium", "lanthanide", [2, 8, 18, 27, 8, 2]],
+            [66, "Dy", "Dysprosium", "lanthanide", [2, 8, 18, 28, 8, 2]],
+            [67, "Ho", "Holmium", "lanthanide", [2, 8, 18, 29, 8, 2]],
+            [68, "Er", "Erbium", "lanthanide", [2, 8, 18, 30, 8, 2]],
+            [69, "Tm", "Thulium", "lanthanide", [2, 8, 18, 31, 8, 2]],
+            [70, "Yb", "Ytterbium", "lanthanide", [2, 8, 18, 32, 8, 2]],
+            [71, "Lu", "Lutetium", "lanthanide", [2, 8, 18, 32, 9, 2]],
+            [72, "Hf", "Hafnium", "transition-metal", [2, 8, 18, 32, 10, 2]],
+            [73, "Ta", "Tantalum", "transition-metal", [2, 8, 18, 32, 11, 2]],
+            [74, "W", "Tungsten", "transition-metal", [2, 8, 18, 32, 12, 2]],
+            [75, "Re", "Rhenium", "transition-metal", [2, 8, 18, 32, 13, 2]],
+            [76, "Os", "Osmium", "transition-metal", [2, 8, 18, 32, 14, 2]],
+            [77, "Ir", "Iridium", "transition-metal", [2, 8, 18, 32, 15, 2]],
+            [78, "Pt", "Platinum", "transition-metal", [2, 8, 18, 32, 17, 1]],
+            [79, "Au", "Gold", "transition-metal", [2, 8, 18, 32, 18, 1]],
+            [80, "Hg", "Mercury", "transition-metal", [2, 8, 18, 32, 18, 2]],
+            [81, "Tl", "Thallium", "post-transition", [2, 8, 18, 32, 18, 3]],
+            [82, "Pb", "Lead", "post-transition", [2, 8, 18, 32, 18, 4]],
+            [83, "Bi", "Bismuth", "post-transition", [2, 8, 18, 32, 18, 5]],
+            [84, "Po", "Polonium", "post-transition", [2, 8, 18, 32, 18, 6]],
+            [85, "At", "Astatine", "metalloid", [2, 8, 18, 32, 18, 7]],
+            [86, "Rn", "Radon", "noble-gas", [2, 8, 18, 32, 18, 8]],
+            [87, "Fr", "Francium", "alkali-metal", [2, 8, 18, 32, 18, 8, 1]],
+            [88, "Ra", "Radium", "alkaline-earth", [2, 8, 18, 32, 18, 8, 2]],
+            [89, "Ac", "Actinium", "actinide", [2, 8, 18, 32, 18, 9, 2]],
+            [90, "Th", "Thorium", "actinide", [2, 8, 18, 32, 18, 10, 2]],
+            [91, "Pa", "Protactinium", "actinide", [2, 8, 18, 32, 20, 9, 2]],
+            [92, "U", "Uranium", "actinide", [2, 8, 18, 32, 21, 9, 2]],
+            [93, "Np", "Neptunium", "actinide", [2, 8, 18, 32, 22, 9, 2]],
+            [94, "Pu", "Plutonium", "actinide", [2, 8, 18, 32, 24, 8, 2]],
+            [95, "Am", "Americium", "actinide", [2, 8, 18, 32, 25, 8, 2]],
+            [96, "Cm", "Curium", "actinide", [2, 8, 18, 32, 25, 9, 2]],
+            [97, "Bk", "Berkelium", "actinide", [2, 8, 18, 32, 27, 8, 2]],
+            [98, "Cf", "Californium", "actinide", [2, 8, 18, 32, 28, 8, 2]],
+            [99, "Es", "Einsteinium", "actinide", [2, 8, 18, 32, 29, 8, 2]],
+            [100, "Fm", "Fermium", "actinide", [2, 8, 18, 32, 30, 8, 2]],
+            [101, "Md", "Mendelevium", "actinide", [2, 8, 18, 32, 31, 8, 2]],
+            [102, "No", "Nobelium", "actinide", [2, 8, 18, 32, 32, 8, 2]],
+            [103, "Lr", "Lawrencium", "actinide", [2, 8, 18, 32, 32, 8, 3]],
+            [104, "Rf", "Rutherfordium", "transition-metal", [2, 8, 18, 32, 32, 10, 2]],
+            [105, "Db", "Dubnium", "transition-metal", [2, 8, 18, 32, 32, 11, 2]],
+            [106, "Sg", "Seaborgium", "transition-metal", [2, 8, 18, 32, 32, 12, 2]],
+            [107, "Bh", "Bohrium", "transition-metal", [2, 8, 18, 32, 32, 13, 2]],
+            [108, "Hs", "Hassium", "transition-metal", [2, 8, 18, 32, 32, 14, 2]],
+            [109, "Mt", "Meitnerium", "unknown", [2, 8, 18, 32, 32, 15, 2]],
+            [110, "Ds", "Darmstadtium", "unknown", [2, 8, 18, 32, 32, 17, 1]],
+            [111, "Rg", "Roentgenium", "unknown", [2, 8, 18, 32, 32, 18, 1]],
+            [112, "Cn", "Copernicium", "unknown", [2, 8, 18, 32, 32, 18, 2]],
+            [113, "Nh", "Nihonium", "unknown", [2, 8, 18, 32, 32, 18, 3]],
+            [114, "Fl", "Flerovium", "unknown", [2, 8, 18, 32, 32, 18, 4]],
+            [115, "Mc", "Moscovium", "unknown", [2, 8, 18, 32, 32, 18, 5]],
+            [116, "Lv", "Livermorium", "unknown", [2, 8, 18, 32, 32, 18, 6]],
+            [117, "Ts", "Tennessine", "unknown", [2, 8, 18, 32, 32, 18, 7]],
+            [118, "Og", "Oganesson", "unknown", [2, 8, 18, 32, 32, 18, 8]]
+        ];
+
+        /* =====================================================================
+           2. 14 AMBIENT & CHROMATIC COLOR THEMES
+           ===================================================================== */
+        const RESONANCE_PALETTES = {
+            "theme_default": {
+                primary: null, glow: null, voidBg: "#030407", nebulaTint: "rgba(15, 23, 42, 0.35)",
+                swatch: "linear-gradient(135deg, #38bdf8, #e879f9)"
+            },
+            "theme_aurora": {
+                primary: "#2dd4bf", glow: "rgba(45, 212, 191, 0.55)", voidBg: "#020809", nebulaTint: "rgba(13, 148, 136, 0.2)",
+                swatch: "#2dd4bf"
+            },
+            "theme_solar": {
+                primary: "#fbbf24", glow: "rgba(251, 191, 36, 0.55)", voidBg: "#090602", nebulaTint: "rgba(217, 119, 6, 0.2)",
+                swatch: "#fbbf24"
+            },
+            "theme_indigo": {
+                primary: "#818cf8", glow: "rgba(129, 140, 248, 0.55)", voidBg: "#04040c", nebulaTint: "rgba(79, 70, 229, 0.22)",
+                swatch: "#818cf8"
+            },
+            "theme_sakura": {
+                primary: "#f472b6", glow: "rgba(244, 114, 182, 0.55)", voidBg: "#0a0307", nebulaTint: "rgba(219, 39, 119, 0.2)",
+                swatch: "#f472b6"
+            },
+            "theme_matcha": {
+                primary: "#86efac", glow: "rgba(134, 239, 172, 0.52)", voidBg: "#030804", nebulaTint: "rgba(22, 163, 74, 0.18)",
+                swatch: "#86efac"
+            },
+            "theme_magenta": {
+                primary: "#e879f9", glow: "rgba(232, 121, 249, 0.55)", voidBg: "#08030a", nebulaTint: "rgba(192, 38, 211, 0.2)",
+                swatch: "#e879f9"
+            },
+            "theme_abyss": {
+                primary: "#38bdf8", glow: "rgba(56, 189, 248, 0.45)", voidBg: "#010308", nebulaTint: "rgba(3, 105, 161, 0.24)",
+                swatch: "#0284c7"
+            },
+            "theme_crimson": {
+                primary: "#fb7185", glow: "rgba(251, 113, 133, 0.55)", voidBg: "#0a0204", nebulaTint: "rgba(225, 29, 72, 0.2)",
+                swatch: "#fb7185"
+            },
+            "theme_lavender": {
+                primary: "#c084fc", glow: "rgba(192, 132, 252, 0.55)", voidBg: "#06030b", nebulaTint: "rgba(147, 51, 234, 0.2)",
+                swatch: "#c084fc"
+            },
+            "theme_frost": {
+                primary: "#7dd3fc", glow: "rgba(125, 211, 252, 0.55)", voidBg: "#02070b", nebulaTint: "rgba(14, 165, 233, 0.2)",
+                swatch: "#bae6fd"
+            },
+            "theme_tangerine": {
+                primary: "#fb923c", glow: "rgba(251, 146, 60, 0.55)", voidBg: "#0a0502", nebulaTint: "rgba(234, 88, 12, 0.2)",
+                swatch: "#fb923c"
+            },
+            "theme_emerald": {
+                primary: "#34d399", glow: "rgba(52, 211, 153, 0.55)", voidBg: "#020805", nebulaTint: "rgba(5, 150, 105, 0.22)",
+                swatch: "#10b981"
+            },
+            "theme_monochrome": {
+                primary: "#e2e8f0", glow: "rgba(226, 232, 240, 0.48)", voidBg: "#040405", nebulaTint: "rgba(148, 163, 184, 0.14)",
+                swatch: "#cbd5e1"
+            }
+        };
+
+        /* =====================================================================
+           3. PER-PET COLOR PALETTES (8 COLORS EACH; REINDEER = NOSE COLOR ONLY)
+           ===================================================================== */
+        const PET_COLOR_SWATCHES = {
+            "pet_tardigrade": [
+                { id: "mint",   name: "Moss Mint",      fill: "rgba(52, 211, 153, 0.36)",  stroke: "#6ee7b7", swatch: "#34d399" },
+                { id: "pink",   name: "Bubblegum",      fill: "rgba(244, 114, 182, 0.36)", stroke: "#f9a8d4", swatch: "#f472b6" },
+                { id: "sky",    name: "Glacier Blue",   fill: "rgba(56, 189, 248, 0.36)",  stroke: "#7dd3fc", swatch: "#38bdf8" },
+                { id: "grape",  name: "Cosmic Grape",   fill: "rgba(192, 132, 252, 0.36)", stroke: "#d8b4fe", swatch: "#c084fc" },
+                { id: "lemon",  name: "Lemon Sherbet",  fill: "rgba(250, 204, 21, 0.34)",  stroke: "#fde047", swatch: "#facc15" },
+                { id: "peach",  name: "Apricot Jelly",  fill: "rgba(251, 146, 60, 0.36)",  stroke: "#fdba74", swatch: "#fb923c" },
+                { id: "cloud",  name: "Albino Pearl",   fill: "rgba(226, 232, 240, 0.32)", stroke: "#f8fafc", swatch: "#e2e8f0" },
+                { id: "coral",  name: "Strawberry",     fill: "rgba(251, 113, 133, 0.36)", stroke: "#fda4af", swatch: "#fb7185" }
+            ],
+            "pet_rabbit": [
+                { id: "snow",     name: "Snow Mochi",     fill: "rgba(248, 250, 252, 0.34)", stroke: "#f8fafc", inner: "#fbcfe8", swatch: "#f8fafc" },
+                { id: "sakura",   name: "Sakura Bunny",   fill: "rgba(244, 114, 182, 0.36)", stroke: "#f9a8d4", inner: "#fdf2f8", swatch: "#f472b6" },
+                { id: "caramel",  name: "Caramel Lop",    fill: "rgba(217, 119, 6, 0.40)",   stroke: "#fbbf24", inner: "#fde68a", swatch: "#d97706" },
+                { id: "lavender", name: "Lavender Puff",  fill: "rgba(192, 132, 252, 0.36)", stroke: "#d8b4fe", inner: "#f3e8ff", swatch: "#c084fc" },
+                { id: "mint",     name: "Matcha Bun",     fill: "rgba(134, 239, 172, 0.34)", stroke: "#86efac", inner: "#dcfce7", swatch: "#86efac" },
+                { id: "sky",      name: "Cloud Sky",      fill: "rgba(56, 189, 248, 0.34)",  stroke: "#7dd3fc", inner: "#e0f2fe", swatch: "#38bdf8" },
+                { id: "ash",      name: "Dusty Chinchilla",fill:"rgba(148, 163, 184, 0.40)", stroke: "#cbd5e1", inner: "#fbcfe8", swatch: "#94a3b8" },
+                { id: "cocoa",    name: "Cocoa Truffle",  fill: "rgba(120, 53, 15, 0.54)",   stroke: "#d97706", inner: "#fed7aa", swatch: "#78350f" }
+            ],
+            "pet_reindeer": [
+                { id: "red",    name: "Classic Ruby",   nose: "#ef4444", glow: "#fca5a5", swatch: "#ef4444" },
+                { id: "cyan",   name: "Frost Cyan",     nose: "#06b6d4", glow: "#a5f3fc", swatch: "#22d3ee" },
+                { id: "gold",   name: "Starlight Gold", nose: "#f59e0b", glow: "#fde68a", swatch: "#fbbf24" },
+                { id: "lime",   name: "Radioactive",    nose: "#22c55e", glow: "#bbf7d0", swatch: "#4ade80" },
+                { id: "pink",   name: "Neon Magenta",   nose: "#ec4899", glow: "#fbcfe8", swatch: "#f472b6" },
+                { id: "violet", name: "Ultraviolet",    nose: "#8b5cf6", glow: "#ddd6fe", swatch: "#a78bfa" },
+                { id: "orange", name: "Tangerine",      nose: "#f97316", glow: "#fed7aa", swatch: "#fb923c" },
+                { id: "white",  name: "Polar Pearl",    nose: "#f8fafc", glow: "#bae6fd", swatch: "#f8fafc" }
+            ],
+            "pet_daruma": [
+                { id: "red",      name: "Lucky Crimson",  fill: "rgba(239, 68, 68, 0.44)",   stroke: "#f87171", swatch: "#ef4444" },
+                { id: "gold",     name: "Wealth Gold",    fill: "rgba(234, 179, 8, 0.42)",   stroke: "#fde047", swatch: "#eab308" },
+                { id: "pink",     name: "Romance Sakura", fill: "rgba(236, 72, 153, 0.42)",  stroke: "#f9a8d4", swatch: "#ec4899" },
+                { id: "indigo",   name: "Wisdom Indigo",  fill: "rgba(99, 102, 241, 0.44)",  stroke: "#a5b4fc", swatch: "#6366f1" },
+                { id: "emerald",  name: "Health Jade",    fill: "rgba(16, 185, 129, 0.42)",  stroke: "#6ee7b7", swatch: "#10b981" },
+                { id: "violet",   name: "Royalty Plum",   fill: "rgba(168, 85, 247, 0.42)",  stroke: "#d8b4fe", swatch: "#a855f7" },
+                { id: "white",    name: "Purity Ivory",   fill: "rgba(241, 245, 249, 0.34)", stroke: "#f8fafc", swatch: "#f1f5f9" },
+                { id: "obsidian", name: "Ward Obsidian",  fill: "rgba(30, 41, 59, 0.78)",    stroke: "#94a3b8", swatch: "#334155" }
+            ],
+            "pet_monkey": [
+                { id: "cocoa",    name: "Toasted Cocoa",  fill: "rgba(146, 64, 14, 0.50)",   stroke: "#d97706", face: "#fde68a", swatch: "#b45309" },
+                { id: "banana",   name: "Banana Split",   fill: "rgba(234, 179, 8, 0.40)",   stroke: "#fde047", face: "#fef9c3", swatch: "#eab308" },
+                { id: "sakura",   name: "Onsen Macaque",  fill: "rgba(244, 114, 182, 0.36)", stroke: "#f9a8d4", face: "#ffe4e6", swatch: "#f472b6" },
+                { id: "emerald",  name: "Jungle Moss",    fill: "rgba(16, 185, 129, 0.38)",  stroke: "#6ee7b7", face: "#fef3c7", swatch: "#10b981" },
+                { id: "grape",    name: "Cosmic Chimp",   fill: "rgba(139, 92, 246, 0.42)",  stroke: "#c4b5fd", face: "#ede9fe", swatch: "#8b5cf6" },
+                { id: "sky",      name: "Frost Gibbon",   fill: "rgba(56, 189, 248, 0.38)",  stroke: "#7dd3fc", face: "#e0f2fe", swatch: "#38bdf8" },
+                { id: "crimson",  name: "Mandrill Red",   fill: "rgba(225, 29, 72, 0.42)",   stroke: "#fb7185", face: "#fecdd3", swatch: "#e11d48" },
+                { id: "silver",   name: "Silverback",     fill: "rgba(100, 116, 139, 0.46)", stroke: "#cbd5e1", face: "#f1f5f9", swatch: "#64748b" }
+            ],
+            "pet_bear": [
+                { id: "honey",    name: "Honey Grizzly",  fill: "rgba(180, 83, 9, 0.48)",    stroke: "#f59e0b", muzzle: "#fef3c7", swatch: "#d97706" },
+                { id: "polar",    name: "Polar Snow",     fill: "rgba(241, 245, 249, 0.34)", stroke: "#f8fafc", muzzle: "#e0f2fe", swatch: "#f8fafc" },
+                { id: "panda",    name: "Bamboo Panda",   fill: "rgba(248, 250, 252, 0.34)", stroke: "#334155", muzzle: "#cbd5e1", swatch: "#334155" },
+                { id: "berry",    name: "Blueberry Bear", fill: "rgba(99, 102, 241, 0.42)",  stroke: "#a5b4fc", muzzle: "#e0e7ff", swatch: "#6366f1" },
+                { id: "rose",     name: "Gummy Rose",     fill: "rgba(251, 113, 133, 0.38)", stroke: "#fda4af", muzzle: "#ffe4e6", swatch: "#fb7185" },
+                { id: "mint",     name: "Mint Gummy",     fill: "rgba(52, 211, 153, 0.36)",  stroke: "#6ee7b7", muzzle: "#d1fae5", swatch: "#34d399" },
+                { id: "butter",   name: "Butterscotch",   fill: "rgba(245, 158, 11, 0.40)",  stroke: "#fcd34d", muzzle: "#fef9c3", swatch: "#fbbf24" },
+                { id: "plum",     name: "Ube Teddy",      fill: "rgba(168, 85, 247, 0.40)",  stroke: "#d8b4fe", muzzle: "#f3e8ff", swatch: "#a855f7" }
+            ],
+            "pet_cat": [
+                { id: "calico",   name: "Classic Calico", fill: "rgba(241, 245, 249, 0.28)", stroke: "#e2e8f0", spot1: "rgba(251, 146, 60, 0.58)", spot2: "rgba(51, 65, 85, 0.68)", swatch: "#f8fafc" },
+                { id: "orange",   name: "Orange Tabby",   fill: "rgba(251, 146, 60, 0.40)",  stroke: "#fdba74", spot1: "rgba(234, 88, 12, 0.55)",  spot2: "rgba(254, 215, 170, 0.45)", swatch: "#fb923c" },
+                { id: "void",     name: "Midnight Void",  fill: "rgba(30, 41, 59, 0.82)",    stroke: "#94a3b8", spot1: "rgba(15, 23, 42, 0.7)",    spot2: "rgba(71, 85, 105, 0.55)", swatch: "#1e293b" },
+                { id: "tuxedo",   name: "Tuxedo",         fill: "rgba(30, 41, 59, 0.78)",    stroke: "#e2e8f0", spot1: "rgba(248, 250, 252, 0.55)", spot2: "rgba(248, 250, 252, 0.4)", swatch: "#475569" },
+                { id: "siamese",  name: "Siamese Cream",  fill: "rgba(254, 243, 199, 0.38)", stroke: "#fde68a", spot1: "rgba(120, 53, 15, 0.6)",   spot2: "rgba(146, 64, 14, 0.55)", swatch: "#fde68a" },
+                { id: "russian",  name: "Russian Blue",   fill: "rgba(100, 116, 139, 0.44)", stroke: "#cbd5e1", spot1: "rgba(71, 85, 105, 0.5)",   spot2: "rgba(148, 163, 184, 0.45)", swatch: "#64748b" },
+                { id: "sakura",   name: "Sakura Mochi",   fill: "rgba(244, 114, 182, 0.36)", stroke: "#fbcfe8", spot1: "rgba(236, 72, 153, 0.45)", spot2: "rgba(255, 255, 255, 0.45)", swatch: "#f472b6" },
+                { id: "matcha",   name: "Matcha Bean",    fill: "rgba(134, 239, 172, 0.34)", stroke: "#bbf7d0", spot1: "rgba(34, 197, 94, 0.45)",  spot2: "rgba(254, 249, 195, 0.45)", swatch: "#86efac" }
+            ],
+            "pet_hamster": [
+                { id: "golden",   name: "Golden Syrup",   fill: "rgba(253, 224, 71, 0.36)",  stroke: "#fbbf24", swatch: "#fbbf24" },
+                { id: "cream",    name: "Vanilla Cream",  fill: "rgba(254, 243, 199, 0.38)", stroke: "#fde68a", swatch: "#fef3c7" },
+                { id: "cinnamon", name: "Cinnamon Roll",  fill: "rgba(217, 119, 6, 0.42)",   stroke: "#f59e0b", swatch: "#d97706" },
+                { id: "pearl",    name: "Winter Pearl",   fill: "rgba(241, 245, 249, 0.34)", stroke: "#f8fafc", swatch: "#f8fafc" },
+                { id: "sapphire", name: "Winter Sapphire",fill: "rgba(148, 163, 184, 0.42)", stroke: "#cbd5e1", swatch: "#94a3b8" },
+                { id: "mochi",    name: "Strawberry Milk",fill: "rgba(251, 113, 133, 0.35)", stroke: "#fda4af", swatch: "#fb7185" },
+                { id: "taro",     name: "Taro Puff",      fill: "rgba(192, 132, 252, 0.35)", stroke: "#d8b4fe", swatch: "#c084fc" },
+                { id: "caramel",  name: "Toasted Mocha",  fill: "rgba(146, 64, 14, 0.46)",   stroke: "#d97706", swatch: "#92400e" }
+            ]
+        };
+
+        /* =====================================================================
+           4. SILLY EDIBLE CHEESES (AWARDED 1 RANDOMLY EVERY 5 STUDY MINUTES)
+           ===================================================================== */
+        const SILLY_CHEESES = [
+            {
+                id: "cheese_mozz",
+                name: "String Theory Mozzarella",
+                pun: "Stretchy across 11 dimensions! *chomp* 🧀",
+                svg: `<svg viewBox="0 0 36 36"><ellipse cx="18" cy="18" rx="13" ry="10" fill="#fef9c3" stroke="#fde047" stroke-width="2"/><path d="M10 16 Q18 21 26 16" fill="none" stroke="#eab308" stroke-width="1.6" stroke-linecap="round"/></svg>`
+            },
+            {
+                id: "cheese_swiss",
+                name: "Schrödinger's Swiss",
+                pun: "Both eaten and delicious at the same time! 🧀",
+                svg: `<svg viewBox="0 0 36 36"><path d="M6 25 L19 8 L31 23 L6 25 Z" fill="#fde047" stroke="#eab308" stroke-width="1.8" stroke-linejoin="round"/><circle cx="17" cy="19" r="2.3" fill="#ca8a04"/><circle cx="23" cy="21" r="1.7" fill="#ca8a04"/><circle cx="13" cy="22" r="1.5" fill="#ca8a04"/></svg>`
+            },
+            {
+                id: "cheese_gouda",
+                name: "Gouda Vibrations",
+                pun: "Resonating in my tummy! *munch* 🧀",
+                svg: `<svg viewBox="0 0 36 36"><path d="M7 22 A11 11 0 0 1 29 22 Z" fill="#facc15" stroke="#dc2626" stroke-width="2.4"/><circle cx="15" cy="18" r="1.5" fill="#ca8a04"/><circle cx="22" cy="19" r="1.3" fill="#ca8a04"/></svg>`
+            },
+            {
+                id: "cheese_brie",
+                name: "Brie-lliant Hypothesis",
+                pun: "Soft, creamy, and completely devoured! 🧀",
+                svg: `<svg viewBox="0 0 36 36"><polygon points="6,23 19,9 30,21 16,27" fill="#fef08a" stroke="#f8fafc" stroke-width="2.2" stroke-linejoin="round"/></svg>`
+            },
+            {
+                id: "cheese_roquefort",
+                name: "Dark Matter Roquefort",
+                pun: "95% mysterious flavor! *crunch* 🧀",
+                svg: `<svg viewBox="0 0 36 36"><polygon points="7,25 18,9 30,24" fill="#e2e8f0" stroke="#94a3b8" stroke-width="1.8" stroke-linejoin="round"/><circle cx="16" cy="18" r="1.8" fill="#38bdf8"/><circle cx="22" cy="21" r="1.6" fill="#0284c7"/><circle cx="14" cy="22" r="1.3" fill="#38bdf8"/></svg>`
+            },
+            {
+                id: "cheese_cheddar",
+                name: "Supernova Cheddar",
+                pun: "Sharp enough to split an atom! *nom* 🧀",
+                svg: `<svg viewBox="0 0 36 36"><polygon points="6,24 20,8 31,22 15,27" fill="#fb923c" stroke="#ea580c" stroke-width="1.8" stroke-linejoin="round"/></svg>`
+            }
+        ];
+
+        /* =====================================================================
+           5. COMPLETE QUANTUM LAB SHOP CATALOG (STRICTLY ORDERED CHEAP -> EXPENSIVE)
+           ===================================================================== */
+        const SHOP_CATALOG = [
+            // 8 Derpy Oval-Blob Species (30 Quanta gap):
+            // Tardigrade (180) -> Rabbit (210) -> Reindeer (240) -> Daruma (270) -> Monkey (300) -> Bear (330) -> Cat (360) -> Hamster (390)
+            {
+                id: "pet_tardigrade",
+                type: "pet",
+                name: "Tardigrade Blob",
+                desc: "Classic squishy 8-legged derpy oval blob surviving exam season.",
+                cost: 180,
+                quotes: ["Surviving exam season easily!", "Slow & steady wins! 🐻", "Zero stress in the cosmos~", "Got any cheese? 🧀"]
+            },
+            {
+                id: "pet_rabbit",
+                type: "pet",
+                name: "Rabbit Blob",
+                desc: "Squishy oval bunny blob with tall ears, twitchy nose, and cotton tail.",
+                cost: 210,
+                quotes: ["*Nose twitches furiously* 🐰", "Hopping through flashcards!", "Ears tuned to study vibes~", "Bunnies love cheese too! 🧀"]
+            },
+            {
+                id: "pet_reindeer",
+                type: "pet",
+                name: "Red-Nosed Reindeer Blob",
+                desc: "Warm brown squishy blob with antlers and customizable glowing nose!",
+                cost: 240,
+                quotes: ["*Nose glows brightly* ✨", "Guiding your study sleigh!", "Derpy holiday vibes~ 🦌", "Cheese powers my nose! 🧀"]
+            },
+            {
+                id: "pet_daruma",
+                type: "pet",
+                name: "Daruma Blob",
+                desc: "Squishy lucky oval blob with stubby legs and fierce determined brows.",
+                cost: 270,
+                quotes: ["Good luck on your exams! 🏮", "Fall 7 times, study 8! 💪", "Wobbling with determination!", "Lucky cheese time! 🧀"]
+            },
+            {
+                id: "pet_monkey",
+                type: "pet",
+                name: "Monkey Blob",
+                desc: "Goofy oval monkey blob with round ears, curly tail, and big grin.",
+                cost: 300,
+                quotes: ["Ooh ooh aah aah focus! 🐒", "Swinging through chapters!", "No monkey business—just study!", "Banana + cheese = genius! 🧀"]
+            },
+            {
+                id: "pet_bear",
+                type: "pet",
+                name: "Bear Blob",
+                desc: "Chubby round bear blob with tiny ears, soft muzzle, and sleepy eyes.",
+                cost: 330,
+                quotes: ["Beary proud of your focus! 🐻", "Hibernating in textbook pages~", "Warm cozy study vibes...", "Honey & cheese platter! 🧀"]
+            },
+            {
+                id: "pet_cat",
+                type: "pet",
+                name: "Chubby Cat Blob",
+                desc: "Squishy oval cat blob with pointed ears, whiskers, and stubby paws.",
+                cost: 360,
+                quotes: ["Purring in blob form... 🐾", "Meow-gnificent focus!", "Feed me cheese human~ 🐱", "Squishy study nap~"]
+            },
+            {
+                id: "pet_hamster",
+                type: "pet",
+                name: "Hamster Blob",
+                desc: "Ultra-round cheek-puffed hamster blob with rosy cheeks and tiny paws.",
+                cost: 390,
+                quotes: ["*Cheeks stuffed with cheese* 🐹", "Running on my study wheel!", "Squeak squeak focus!", "Maximum cheek capacity! 🧀"]
+            },
+            // Lab Upgrades & Soundscapes
+            {
+                id: "upg_starfield",
+                type: "upgrade",
+                name: "Deep Space Starfield",
+                desc: "Adds gentle drifting cosmic dust and twinkling stars to the void.",
+                cost: 120
+            },
+            {
+                id: "upg_chime",
+                type: "upgrade",
+                name: "Singing Bowl Discovery Chime",
+                desc: "Plays a soft harmonic bell when a study minute completes.",
+                cost: 140
+            },
+            {
+                id: "upg_trails",
+                type: "upgrade",
+                name: "Quantum Wave Trails",
+                desc: "Extends luminous light ribbons behind orbiting electrons.",
+                cost: 160
+            },
+            {
+                id: "upg_rain",
+                type: "upgrade",
+                name: "Cosmic Rain Synth Layer",
+                desc: "Enriches the ambient sound button with soft observatory rain.",
+                cost: 200
+            },
+            // 14 Chromatic & Ambient Color Themes
+            {
+                id: "theme_default",
+                type: "theme",
+                name: "Obsidian Element Spectrum",
+                desc: "Classic dark void with each element's true chemical family hue.",
+                cost: 0
+            },
+            {
+                id: "theme_aurora",
+                type: "theme",
+                name: "Aurora Borealis",
+                desc: "Serene northern-lights teal & emerald glow over deep teal void.",
+                cost: 120
+            },
+            {
+                id: "theme_solar",
+                type: "theme",
+                name: "Solar Gold",
+                desc: "Warm amber-gold plasma rings on an obsidian-bronze canvas.",
+                cost: 130
+            },
+            {
+                id: "theme_indigo",
+                type: "theme",
+                name: "Bioluminescent Indigo",
+                desc: "Deep cosmic indigo-violet aura for midnight study sessions.",
+                cost: 140
+            },
+            {
+                id: "theme_sakura",
+                type: "theme",
+                name: "Sakura Rose",
+                desc: "Soft cherry-blossom pink luminescence against dark plum.",
+                cost: 150
+            },
+            {
+                id: "theme_matcha",
+                type: "theme",
+                name: "Matcha Zen",
+                desc: "Calming sage-mint green rings over a quiet forest shadow.",
+                cost: 160
+            },
+            {
+                id: "theme_magenta",
+                type: "theme",
+                name: "Cyber Magenta",
+                desc: "Electric orchid-magenta glow for high-focus late-night flow.",
+                cost: 170
+            },
+            {
+                id: "theme_abyss",
+                type: "theme",
+                name: "Midnight Abyss",
+                desc: "Deep ocean trench sapphire blue with serene aquatic shimmer.",
+                cost: 180
+            },
+            {
+                id: "theme_crimson",
+                type: "theme",
+                name: "Crimson Nebula",
+                desc: "Velvet rose-crimson starlight over a deep garnet void.",
+                cost: 190
+            },
+            {
+                id: "theme_lavender",
+                type: "theme",
+                name: "Lavender Twilight",
+                desc: "Dreamy pastel-violet dusk aura for calm reading sessions.",
+                cost: 200
+            },
+            {
+                id: "theme_frost",
+                type: "theme",
+                name: "Arctic Frost",
+                desc: "Crisp glacial ice-blue rings over a polar night sky.",
+                cost: 210
+            },
+            {
+                id: "theme_tangerine",
+                type: "theme",
+                name: "Tangerine Sunset",
+                desc: "Cozy sunset-orange warmth over a twilight ember backdrop.",
+                cost: 220
+            },
+            {
+                id: "theme_emerald",
+                type: "theme",
+                name: "Emerald Forest",
+                desc: "Rich jade-emerald glow inspired by deep woodland moss.",
+                cost: 240
+            },
+            {
+                id: "theme_monochrome",
+                type: "theme",
+                name: "Lunar Monochrome",
+                desc: "Minimalist silver-white moonlight rings on pure obsidian.",
+                cost: 260
+            }
+        ];
+
+        /* Dynamic SVG Generator supporting all 8 species and 8 color palettes each */
+        function getPetSVG(petId, colorId) {
+            const paletteList = PET_COLOR_SWATCHES[petId] || [];
+            const c = paletteList.find(p => p.id === colorId) || paletteList[0];
+
+            if (petId === "pet_tardigrade") {
+                return `
+                    <svg viewBox="0 0 96 76" width="100%" height="100%">
+                        <rect x="16" y="18" width="64" height="40" rx="20" fill="${c.fill}" stroke="${c.stroke}" stroke-width="2.6"/>
+                        <path d="M26 57 V65 M38 58 V66 M52 58 V66 M66 57 V65" stroke="${c.stroke}" stroke-width="4.2" stroke-linecap="round"/>
+                        <path d="M36 20 Q34 38 36 56 M54 20 Q56 38 54 56" fill="none" stroke="${c.stroke}" stroke-width="1.5" opacity="0.45"/>
+                        <circle cx="24" cy="34" r="2.2" fill="#f8fafc"/>
+                        <circle cx="33" cy="34" r="2.2" fill="#f8fafc"/>
+                        <circle cx="28.5" cy="40" r="3" fill="none" stroke="${c.stroke}" stroke-width="2"/>
+                    </svg>`;
+            }
+
+            if (petId === "pet_rabbit") {
+                return `
+                    <svg viewBox="0 0 96 76" width="100%" height="100%">
+                        <ellipse cx="26" cy="13" rx="4.2" ry="11" transform="rotate(-10 26 13)" fill="${c.fill}" stroke="${c.stroke}" stroke-width="2.2"/>
+                        <ellipse cx="26" cy="13" rx="1.8" ry="6.5" transform="rotate(-10 26 13)" fill="${c.inner}" opacity="0.75"/>
+                        <ellipse cx="38" cy="13" rx="4.2" ry="11" transform="rotate(10 38 13)" fill="${c.fill}" stroke="${c.stroke}" stroke-width="2.2"/>
+                        <ellipse cx="38" cy="13" rx="1.8" ry="6.5" transform="rotate(10 38 13)" fill="${c.inner}" opacity="0.75"/>
+                        <circle cx="81" cy="43" r="5.5" fill="#f8fafc" stroke="${c.stroke}" stroke-width="2"/>
+                        <rect x="16" y="20" width="64" height="38" rx="19" fill="${c.fill}" stroke="${c.stroke}" stroke-width="2.6"/>
+                        <path d="M27 57 V65 M39 58 V66 M53 58 V66 M65 57 V65" stroke="${c.stroke}" stroke-width="4.2" stroke-linecap="round"/>
+                        <circle cx="25" cy="35" r="2.2" fill="#f8fafc"/>
+                        <circle cx="37" cy="35" r="2.2" fill="#f8fafc"/>
+                        <polygon points="29,39 33,39 31,42" fill="#fb7185"/>
+                        <path d="M28.5 43 Q31 45 31 42.5 Q31 45 33.5 43" fill="none" stroke="#f8fafc" stroke-width="1.6" stroke-linecap="round"/>
+                    </svg>`;
+            }
+
+            if (petId === "pet_reindeer") {
+                return `
+                    <svg viewBox="0 0 96 76" width="100%" height="100%">
+                        <path d="M30 19 L25 9 M27 13 L21 12 M44 19 L49 9 M47 13 L53 12" stroke="#fde68a" stroke-width="2.4" stroke-linecap="round"/>
+                        <rect x="16" y="18" width="64" height="40" rx="20" fill="rgba(180, 115, 68, 0.46)" stroke="#d97706" stroke-width="2.6"/>
+                        <path d="M27 57 V65 M39 58 V66 M53 58 V66 M65 57 V65" stroke="#d97706" stroke-width="4.2" stroke-linecap="round"/>
+                        <ellipse cx="52" cy="43" rx="14" ry="9" fill="rgba(254, 243, 199, 0.2)"/>
+                        <circle cx="24" cy="33" r="2.2" fill="#fef3c7"/>
+                        <circle cx="35" cy="33" r="2.2" fill="#fef3c7"/>
+                        <circle cx="29" cy="40" r="4.6" fill="${c.nose}" stroke="${c.glow}" stroke-width="1.5"/>
+                        <circle cx="27.5" cy="38.5" r="1.3" fill="#ffffff" opacity="0.88"/>
+                    </svg>`;
+            }
+
+            if (petId === "pet_daruma") {
+                return `
+                    <svg viewBox="0 0 96 76" width="100%" height="100%">
+                        <rect x="16" y="18" width="64" height="40" rx="20" fill="${c.fill}" stroke="${c.stroke}" stroke-width="2.6"/>
+                        <path d="M27 57 V65 M39 58 V66 M53 58 V66 M65 57 V65" stroke="${c.stroke}" stroke-width="4.2" stroke-linecap="round"/>
+                        <ellipse cx="32" cy="37" rx="12" ry="11" fill="#fef3c7"/>
+                        <path d="M23 30 Q27 27 30 30 M34 30 Q37 27 41 30" fill="none" stroke="#1e293b" stroke-width="2" stroke-linecap="round"/>
+                        <circle cx="27" cy="35" r="2.4" fill="#0f172a"/>
+                        <circle cx="37" cy="35" r="2.4" fill="#0f172a"/>
+                        <path d="M28 42 Q32 40 36 42" fill="none" stroke="#0f172a" stroke-width="1.8" stroke-linecap="round"/>
+                        <path d="M53 31 V45 M59 29 V47 M65 32 V44" stroke="#fbbf24" stroke-width="2.2" stroke-linecap="round"/>
+                    </svg>`;
+            }
+
+            if (petId === "pet_monkey") {
+                return `
+                    <svg viewBox="0 0 96 76" width="100%" height="100%">
+                        <path d="M79 38 Q91 32 87 22 Q83 16 78 21" fill="none" stroke="${c.stroke}" stroke-width="2.8" stroke-linecap="round"/>
+                        <circle cx="15" cy="33" r="6" fill="${c.fill}" stroke="${c.stroke}" stroke-width="2.2"/>
+                        <circle cx="48" cy="33" r="6" fill="${c.fill}" stroke="${c.stroke}" stroke-width="2.2"/>
+                        <rect x="16" y="18" width="64" height="40" rx="20" fill="${c.fill}" stroke="${c.stroke}" stroke-width="2.6"/>
+                        <ellipse cx="31.5" cy="37" rx="12" ry="11" fill="${c.face}" opacity="0.88"/>
+                        <path d="M27 57 V65 M39 58 V66 M53 58 V66 M65 57 V65" stroke="${c.stroke}" stroke-width="4.2" stroke-linecap="round"/>
+                        <circle cx="26.5" cy="33" r="2.2" fill="#0f172a"/>
+                        <circle cx="36.5" cy="33" r="2.2" fill="#0f172a"/>
+                        <path d="M26 40 Q31.5 45 37 40" fill="none" stroke="#0f172a" stroke-width="2" stroke-linecap="round"/>
+                    </svg>`;
+            }
+
+            if (petId === "pet_bear") {
+                return `
+                    <svg viewBox="0 0 96 76" width="100%" height="100%">
+                        <circle cx="22" cy="19" r="5.5" fill="${c.fill}" stroke="${c.stroke}" stroke-width="2.4"/>
+                        <circle cx="43" cy="19" r="5.5" fill="${c.fill}" stroke="${c.stroke}" stroke-width="2.4"/>
+                        <rect x="15" y="18" width="66" height="41" rx="20.5" fill="${c.fill}" stroke="${c.stroke}" stroke-width="2.6"/>
+                        <path d="M27 58 V66 M39 59 V67 M53 59 V67 M65 58 V66" stroke="${c.stroke}" stroke-width="4.4" stroke-linecap="round"/>
+                        <ellipse cx="32" cy="41" rx="7.5" ry="5.5" fill="${c.muzzle}" opacity="0.9"/>
+                        <circle cx="25" cy="33" r="2.2" fill="#f8fafc"/>
+                        <circle cx="39" cy="33" r="2.2" fill="#f8fafc"/>
+                        <ellipse cx="32" cy="39" rx="2.6" ry="1.9" fill="#0f172a"/>
+                        <path d="M29.5 42.5 Q32 44.5 34.5 42.5" fill="none" stroke="#0f172a" stroke-width="1.6" stroke-linecap="round"/>
+                    </svg>`;
+            }
+
+            if (petId === "pet_cat") {
+                return `
+                    <svg viewBox="0 0 96 76" width="100%" height="100%">
+                        <polygon points="21,21 25,10 32,19" fill="${c.stroke}" stroke="${c.stroke}" stroke-width="2" stroke-linejoin="round"/>
+                        <polygon points="35,19 41,10 45,21" fill="${c.spot2}" stroke="${c.stroke}" stroke-width="2" stroke-linejoin="round"/>
+                        <rect x="16" y="18" width="64" height="40" rx="20" fill="${c.fill}" stroke="${c.stroke}" stroke-width="2.6"/>
+                        <ellipse cx="58" cy="27" rx="9" ry="6" fill="${c.spot1}"/>
+                        <ellipse cx="67" cy="43" rx="7" ry="6" fill="${c.spot2}"/>
+                        <path d="M27 57 V65 M39 58 V66 M53 58 V66 M65 57 V65" stroke="${c.stroke}" stroke-width="4.2" stroke-linecap="round"/>
+                        <circle cx="25" cy="34" r="2.2" fill="#fef08a"/>
+                        <circle cx="37" cy="34" r="2.2" fill="#fef08a"/>
+                        <path d="M28 40 Q31 43 31 40 Q31 43 34 40" fill="none" stroke="#f8fafc" stroke-width="1.8" stroke-linecap="round"/>
+                        <path d="M12 35 H19 M12 39 H19 M43 35 H50 M43 39 H50" stroke="${c.stroke}" stroke-width="1.4" stroke-linecap="round"/>
+                    </svg>`;
+            }
+
+            // pet_hamster (no sunflower seed)
+            return `
+                <svg viewBox="0 0 96 76" width="100%" height="100%">
+                    <circle cx="23" cy="18" r="4.5" fill="${c.fill}" stroke="${c.stroke}" stroke-width="2"/>
+                    <circle cx="42" cy="18" r="4.5" fill="${c.fill}" stroke="${c.stroke}" stroke-width="2"/>
+                    <rect x="16" y="18" width="64" height="40" rx="20" fill="${c.fill}" stroke="${c.stroke}" stroke-width="2.6"/>
+                    <path d="M27 57 V65 M39 58 V66 M53 58 V66 M65 57 V65" stroke="#fda4af" stroke-width="4.2" stroke-linecap="round"/>
+                    <circle cx="21" cy="40" r="4.2" fill="rgba(251, 113, 133, 0.55)"/>
+                    <circle cx="43" cy="40" r="4.2" fill="rgba(251, 113, 133, 0.55)"/>
+                    <circle cx="26" cy="33" r="2.2" fill="#f8fafc"/>
+                    <circle cx="38" cy="33" r="2.2" fill="#f8fafc"/>
+                    <circle cx="32" cy="38" r="2.2" fill="#fb7185"/>
+                    <path d="M29.5 41 Q32 43.5 34.5 41" fill="none" stroke="#f8fafc" stroke-width="1.6" stroke-linecap="round"/>
+                </svg>`;
+        }
+
+        const STORAGE_KEY = "quantum_atom_study_timer_v7";
+
+        /* =====================================================================
+           6. APPLICATION STATE (ZERO STARTING PETS; MULTI-COLOR VARIANT SUPPORT)
+           ===================================================================== */
+        const state = {
+            currentIndex: 0,
+            isPlaying: true,
+            intervalMs: 60000,
+            elapsedMs: 0,
+            lastFrameTime: null,
+            transitionPulse: 1,
+            tiltX: 0,
+            tiltY: 0,
+            targetTiltX: 0,
+            targetTiltY: 0,
+
+            // Persistent Economy & Customization (Starts with 0 pet variants unlocked/equipped)
+            minutesSpent: 0,
+            quanta: 15,
+            unlockedItems: ["theme_default"], // Stores upgrade/theme IDs AND pet variant keys ("pet_tardigrade:mint")
+            equippedVariants: [], // Array of variant keys ("pet_tardigrade:mint", "pet_tardigrade:pink", etc.)
+            shopPreviewColor: {
+                pet_tardigrade: "mint",
+                pet_rabbit: "snow",
+                pet_reindeer: "red",
+                pet_daruma: "red",
+                pet_monkey: "cocoa",
+                pet_bear: "honey",
+                pet_cat: "calico",
+                pet_hamster: "golden"
+            },
+            petPositions: {}, // { "pet_tardigrade:mint": { x, y } }
+            platterPos: null, // { x, y }
+            activeTheme: "theme_default",
+            activeUpgrades: {
+                upg_starfield: false,
+                upg_trails: false,
+                upg_chime: false,
+                upg_rain: false
+            },
+
+            // Persistent Collected Edible Cheeses Map { cheese_id: count }
+            collectedCheeses: {},
+
+            // Active Session Tracker (Runtime + Saved History)
+            currentSession: {
+                startTime: Date.now(),
+                minutes: 0,
+                startElementIdx: 0,
+                endElementIdx: 0,
+                quantaEarned: 0,
+                cheesesWon: 0,
+                note: ""
+            },
+            sessionHistory: []
+        };
+
+        function makeVariantKey(petId, colorId) {
+            return `${petId}:${colorId}`;
+        }
+
+        function parseVariantKey(variantKey) {
+            const parts = String(variantKey).split(":");
+            return { petId: parts[0], colorId: parts[1] };
+        }
+
+        function isValidVariantKey(variantKey) {
+            if (typeof variantKey !== "string" || !variantKey.includes(":")) return false;
+            const { petId, colorId } = parseVariantKey(variantKey);
+            const list = PET_COLOR_SWATCHES[petId];
+            return Array.isArray(list) && list.some(c => c.id === colorId);
+        }
+
+        const stars = Array.from({ length: 85 }, () => ({
+            x: Math.random(),
+            y: Math.random(),
+            size: Math.random() * 1.6 + 0.4,
+            speed: Math.random() * 0.015 + 0.004,
+            phase: Math.random() * Math.PI * 2
+        }));
+
+        /* =====================================================================
+           7. WEB AUDIO API SYNTHESIZER (DRONE, COSMIC RAIN, SINGING BOWL, NIBBLE)
+           ===================================================================== */
+        const soundEngine = {
+            ctx: null,
+            isPlaying: false,
+            masterGain: null,
+            oscs: [],
+            rainNode: null,
+
+            init() {
+                if (!this.ctx) {
+                    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AudioCtx();
+                }
+                if (this.ctx.state === "suspended") {
+                    this.ctx.resume();
+                }
+            },
+
+            toggleAmbient() {
+                try {
+                    this.init();
+                    if (this.isPlaying) {
+                        this.stopAmbient();
+                        return false;
+                    } else {
+                        this.startAmbient();
+                        return true;
+                    }
+                } catch (e) {
+                    return false;
+                }
+            },
+
+            startAmbient() {
+                this.init();
+                const now = this.ctx.currentTime;
+                const master = this.ctx.createGain();
+                master.gain.setValueAtTime(0.0001, now);
+                master.gain.exponentialRampToValueAtTime(0.045, now + 1.8);
+
+                const filter = this.ctx.createBiquadFilter();
+                filter.type = "lowpass";
+                filter.frequency.setValueAtTime(340, now);
+
+                master.connect(filter);
+                filter.connect(this.ctx.destination);
+                this.masterGain = master;
+
+                const freqs = [110, 164.81, 220];
+                this.oscs = freqs.map((f, idx) => {
+                    const osc = this.ctx.createOscillator();
+                    osc.type = idx === 0 ? "sine" : "triangle";
+                    osc.frequency.setValueAtTime(f, now);
+                    osc.connect(master);
+                    osc.start(now);
+                    return osc;
+                });
+
+                if (state.activeUpgrades.upg_rain) {
+                    const bufferSize = this.ctx.sampleRate * 2;
+                    const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+                    const output = noiseBuffer.getChannelData(0);
+                    let lastOut = 0;
+                    for (let i = 0; i < bufferSize; i++) {
+                        const white = Math.random() * 2 - 1;
+                        output[i] = (lastOut + (0.02 * white)) / 1.02;
+                        lastOut = output[i];
+                        output[i] *= 2.4;
+                    }
+                    const whiteNoise = this.ctx.createBufferSource();
+                    whiteNoise.buffer = noiseBuffer;
+                    whiteNoise.loop = true;
+
+                    const rainFilter = this.ctx.createBiquadFilter();
+                    rainFilter.type = "bandpass";
+                    rainFilter.frequency.setValueAtTime(750, now);
+                    rainFilter.Q.setValueAtTime(0.7, now);
+
+                    const rainGain = this.ctx.createGain();
+                    rainGain.gain.setValueAtTime(0.03, now);
+
+                    whiteNoise.connect(rainFilter);
+                    rainFilter.connect(rainGain);
+                    rainGain.connect(this.ctx.destination);
+                    whiteNoise.start(now);
+                    this.rainNode = whiteNoise;
+                }
+
+                this.isPlaying = true;
+            },
+
+            stopAmbient() {
+                if (!this.ctx) return;
+                const now = this.ctx.currentTime;
+                if (this.masterGain) {
+                    this.masterGain.gain.setTargetAtTime(0.0001, now, 0.35);
+                }
+                const oldOscs = this.oscs;
+                const oldRain = this.rainNode;
+                this.oscs = [];
+                this.rainNode = null;
+                this.isPlaying = false;
+                setTimeout(() => {
+                    oldOscs.forEach(o => { try { o.stop(); } catch (e) {} });
+                    if (oldRain) { try { oldRain.stop(); } catch (e) {} }
+                }, 700);
+            },
+
+            playSingingBowl() {
+                try {
+                    this.init();
+                    const now = this.ctx.currentTime;
+                    [528, 1057.5].forEach((freq, idx) => {
+                        const osc = this.ctx.createOscillator();
+                        const gain = this.ctx.createGain();
+                        osc.type = "sine";
+                        osc.frequency.setValueAtTime(freq, now);
+                        gain.gain.setValueAtTime(0.0001, now);
+                        gain.gain.exponentialRampToValueAtTime(idx === 0 ? 0.065 : 0.02, now + 0.07);
+                        gain.gain.exponentialRampToValueAtTime(0.0001, now + 3.0);
+                        osc.connect(gain);
+                        gain.connect(this.ctx.destination);
+                        osc.start(now);
+                        osc.stop(now + 3.1);
+                    });
+                } catch (e) {}
+            },
+
+            playCheeseChime() {
+                try {
+                    this.init();
+                    const now = this.ctx.currentTime;
+                    [587.33, 739.99, 880].forEach((freq, i) => {
+                        const osc = this.ctx.createOscillator();
+                        const gain = this.ctx.createGain();
+                        osc.type = "triangle";
+                        osc.frequency.setValueAtTime(freq, now + i * 0.075);
+                        gain.gain.setValueAtTime(0.0001, now + i * 0.075);
+                        gain.gain.exponentialRampToValueAtTime(0.055, now + i * 0.075 + 0.025);
+                        gain.gain.exponentialRampToValueAtTime(0.0001, now + i * 0.075 + 0.4);
+                        osc.connect(gain);
+                        gain.connect(this.ctx.destination);
+                        osc.start(now + i * 0.075);
+                        osc.stop(now + i * 0.075 + 0.45);
+                    });
+                } catch (e) {}
+            }
+        };
+
+        /* =====================================================================
+           8. LOCALSTORAGE PERSISTENCE & CLEAN MIGRATION
+           ===================================================================== */
+        function loadProgress() {
+            try {
+                const raw = localStorage.getItem(STORAGE_KEY);
+                if (!raw) return;
+                const data = JSON.parse(raw);
+                if (typeof data.currentIndex === "number" && data.currentIndex >= 0 && data.currentIndex < ELEMENTS.length) {
+                    state.currentIndex = data.currentIndex;
+                }
+                if (typeof data.minutesSpent === "number" && data.minutesSpent >= 0) {
+                    state.minutesSpent = Math.floor(data.minutesSpent);
+                }
+                if (typeof data.quanta === "number" && data.quanta >= 0) {
+                    state.quanta = Math.floor(data.quanta);
+                }
+                if (Array.isArray(data.unlockedItems)) {
+                    state.unlockedItems = data.unlockedItems.filter(
+                        item => typeof item === "string" && !item.startsWith("pet_tanuki:")
+                    );
+                }
+                if (Array.isArray(data.equippedVariants)) {
+                    state.equippedVariants = data.equippedVariants.filter(
+                        vk => typeof vk === "string" && !vk.startsWith("pet_tanuki:") && isValidVariantKey(vk) && state.unlockedItems.includes(vk)
+                    );
+                }
+                if (data.shopPreviewColor && typeof data.shopPreviewColor === "object") {
+                    const cleanedPreview = { ...data.shopPreviewColor };
+                    delete cleanedPreview.pet_tanuki;
+                    state.shopPreviewColor = { ...state.shopPreviewColor, ...cleanedPreview };
+                }
+                if (data.petPositions && typeof data.petPositions === "object") {
+                    const cleanedPositions = {};
+                    Object.keys(data.petPositions).forEach(k => {
+                        if (!k.startsWith("pet_tanuki:")) {
+                            cleanedPositions[k] = data.petPositions[k];
+                        }
+                    });
+                    state.petPositions = cleanedPositions;
+                }
+                if (data.platterPos && typeof data.platterPos.x === "number" && typeof data.platterPos.y === "number") {
+                    state.platterPos = data.platterPos;
+                }
+                if (data.activeTheme && RESONANCE_PALETTES[data.activeTheme]) {
+                    state.activeTheme = data.activeTheme;
+                }
+                if (data.activeUpgrades && typeof data.activeUpgrades === "object") {
+                    state.activeUpgrades = { ...state.activeUpgrades, ...data.activeUpgrades };
+                }
+                if (data.collectedCheeses && typeof data.collectedCheeses === "object") {
+                    state.collectedCheeses = data.collectedCheeses;
+                }
+                if (Array.isArray(data.sessionHistory)) {
+                    state.sessionHistory = data.sessionHistory;
+                }
+            } catch (e) {}
+        }
+
+        function saveProgress() {
+            try {
+                const payload = {
+                    currentIndex: state.currentIndex,
+                    minutesSpent: state.minutesSpent,
+                    quanta: state.quanta,
+                    unlockedItems: state.unlockedItems,
+                    equippedVariants: state.equippedVariants,
+                    shopPreviewColor: state.shopPreviewColor,
+                    petPositions: state.petPositions,
+                    platterPos: state.platterPos,
+                    activeTheme: state.activeTheme,
+                    activeUpgrades: state.activeUpgrades,
+                    collectedCheeses: state.collectedCheeses,
+                    sessionHistory: state.sessionHistory
+                };
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+            } catch (e) {}
+        }
+
+        /* =====================================================================
+           9. DOM REFERENCES & UI HELPERS
+           ===================================================================== */
+        const canvas = document.getElementById("atomCanvas");
+        const ctx = canvas.getContext("2d");
+        const categoryLabel = document.getElementById("categoryLabel");
+        const statusDot = document.getElementById("statusDot");
+        const shellsDisplay = document.getElementById("shellsDisplay");
+        const hudQuanta = document.getElementById("hudQuanta");
+        const hudMinutes = document.getElementById("hudMinutes");
+        const hudSessionMins = document.getElementById("hudSessionMins");
+        const toastBanner = document.getElementById("toastBanner");
+
+        // Multi-Pet & Platter DOM
+        const petsLayer = document.getElementById("petsLayer");
+        const cheesePlatterStage = document.getElementById("cheesePlatterStage");
+        const cheeseItemsRow = document.getElementById("cheeseItemsRow");
+
+        // Controls Dock DOM
+        const audioToggleBtn = document.getElementById("audioToggleBtn");
+        const audioMutedIcon = document.getElementById("audioMutedIcon");
+        const audioOnIcon = document.getElementById("audioOnIcon");
+        const prevBtn = document.getElementById("prevBtn");
+        const playPauseBtn = document.getElementById("playPauseBtn");
+        const pauseIcon = document.getElementById("pauseIcon");
+        const playIcon = document.getElementById("playIcon");
+        const nextBtn = document.getElementById("nextBtn");
+        const logSessionDockBtn = document.getElementById("logSessionDockBtn");
+        const resetSessionBtn = document.getElementById("resetSessionBtn");
+        const speedBtn = document.getElementById("speedBtn");
+        const speedLabel = document.getElementById("speedLabel");
+        const timerText = document.getElementById("timerText");
+
+        // Drawers & Modals DOM
+        const drawerBackdrop = document.getElementById("drawerBackdrop");
+        const openShopBtn = document.getElementById("openShopBtn");
+        const closeShopBtn = document.getElementById("closeShopBtn");
+        const shopDrawer = document.getElementById("shopDrawer");
+        const shopQuantaBalance = document.getElementById("shopQuantaBalance");
+        const equippedCountBadge = document.getElementById("equippedCountBadge");
+        const shopPetsList = document.getElementById("shopPetsList");
+        const shopUpgradesList = document.getElementById("shopUpgradesList");
+        const shopThemesList = document.getElementById("shopThemesList");
+
+        const openLogBtn = document.getElementById("openLogBtn");
+        const closeLogBtn = document.getElementById("closeLogBtn");
+        const logDrawer = document.getElementById("logDrawer");
+        const logTotalMins = document.getElementById("logTotalMins");
+        const logTotalSessions = document.getElementById("logTotalSessions");
+        const logTotalCheeses = document.getElementById("logTotalCheeses");
+        const liveSessionStartLabel = document.getElementById("liveSessionStartLabel");
+        const liveSessionStats = document.getElementById("liveSessionStats");
+        const activeSessionNoteInput = document.getElementById("activeSessionNoteInput");
+        const drawerLogSessionBtn = document.getElementById("drawerLogSessionBtn");
+        const clearHistoryBtn = document.getElementById("clearHistoryBtn");
+        const sessionHistoryList = document.getElementById("sessionHistoryList");
+
+        const openEditBtn = document.getElementById("openEditBtn");
+        const closeEditBtn = document.getElementById("closeEditBtn");
+        const cancelEditBtn = document.getElementById("cancelEditBtn");
+        const saveEditBtn = document.getElementById("saveEditBtn");
+        const factoryResetBtn = document.getElementById("factoryResetBtn");
+        const editModal = document.getElementById("editModal");
+        const editMinutesInput = document.getElementById("editMinutesInput");
+        const editQuantaInput = document.getElementById("editQuantaInput");
+        const editElementSelect = document.getElementById("editElementSelect");
+        const syncElementWithMinutes = document.getElementById("syncElementWithMinutes");
+        const addRandomCheeseRecoveryBtn = document.getElementById("addRandomCheeseRecoveryBtn");
+        const clearCheesesRecoveryBtn = document.getElementById("clearCheesesRecoveryBtn");
+        const editUnlocksGrid = document.getElementById("editUnlocksGrid");
+
+        let toastTimeout = null;
+        function showToast(message, isCheese = false) {
+            toastBanner.textContent = message;
+            toastBanner.classList.toggle("cheese-toast", isCheese);
+            toastBanner.classList.add("show");
+            clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => {
+                toastBanner.classList.remove("show");
+            }, 3200);
+        }
+
+        /* =====================================================================
+           10. MULTI-COLOR VARIANT PET STAGE & DRAGGABLE EDIBLE CHEESE PLATTER
+           ===================================================================== */
+        const petSpeechTimers = {};
+        const petNameTagTimers = {};
+
+        function showPetNameTagTemporarily(variantKey) {
+            const safeDomId = `pet-entity-${variantKey.replace(":", "-")}`;
+            const el = document.getElementById(safeDomId);
+            if (!el) return;
+
+            const nameTag = el.querySelector(".pet-name-tag");
+            if (nameTag) {
+                nameTag.classList.add("visible");
+                clearTimeout(petNameTagTimers[variantKey]);
+                petNameTagTimers[variantKey] = setTimeout(() => {
+                    nameTag.classList.remove("visible");
+                }, 3100);
+            }
+        }
+
+        function triggerPetReaction(variantKey, customQuote) {
+            const { petId } = parseVariantKey(variantKey);
+            const petItem = SHOP_CATALOG.find(i => i.id === petId);
+            const safeDomId = `pet-entity-${variantKey.replace(":", "-")}`;
+            const el = document.getElementById(safeDomId);
+            if (!petItem || !el) return;
+
+            const sprite = el.querySelector(".pet-sprite-box");
+            const bubble = el.querySelector(".pet-speech-bubble");
+
+            if (sprite) {
+                sprite.classList.remove("pet-bounce");
+                void sprite.offsetWidth;
+                sprite.classList.add("pet-bounce");
+            }
+
+            if (bubble) {
+                const quote = customQuote || petItem.quotes[Math.floor(Math.random() * petItem.quotes.length)];
+                bubble.textContent = quote;
+                bubble.classList.add("visible");
+
+                clearTimeout(petSpeechTimers[variantKey]);
+                petSpeechTimers[variantKey] = setTimeout(() => {
+                    bubble.classList.remove("visible");
+                }, 3100);
+            }
+        }
+
+        function spawnCheeseCrumbs(clientX, clientY) {
+            for (let i = 0; i < 10; i++) {
+                const crumb = document.createElement("div");
+                crumb.className = "cheese-crumb";
+                const angle = (Math.PI * 2 * i) / 10 + Math.random() * 0.4;
+                const dist = 24 + Math.random() * 28;
+                crumb.style.left = `${clientX}px`;
+                crumb.style.top = `${clientY}px`;
+                crumb.style.setProperty("--dx", `${Math.cos(angle) * dist}px`);
+                crumb.style.setProperty("--dy", `${Math.sin(angle) * dist - 14}px`);
+                document.body.appendChild(crumb);
+                setTimeout(() => crumb.remove(), 700);
+            }
+        }
+
+        function eatCheese(cheeseId, clientX, clientY) {
+            const currentCount = state.collectedCheeses[cheeseId] || 0;
+            if (currentCount <= 0) return;
+
+            if (currentCount - 1 <= 0) {
+                delete state.collectedCheeses[cheeseId];
+            } else {
+                state.collectedCheeses[cheeseId] = currentCount - 1;
+            }
+
+            const cheese = SILLY_CHEESES.find(c => c.id === cheeseId);
+            spawnCheeseCrumbs(clientX, clientY);
+            soundEngine.playCheeseChime();
+            saveProgress();
+            renderCheesePlatter();
+
+            const reactionText = cheese ? `Ate ${cheese.name}! ${cheese.pun}` : "Yum! Cheese eaten! 🧀";
+            if (state.equippedVariants.length > 0) {
+                const luckyVariant = state.equippedVariants[Math.floor(Math.random() * state.equippedVariants.length)];
+                triggerPetReaction(luckyVariant, reactionText);
+            } else {
+                showToast(reactionText, true);
+            }
+        }
+
+        function clampAndApplyCoords(el, posObj, fallbackX, fallbackY) {
+            const rect = el.getBoundingClientRect();
+            const w = rect.width || 86;
+            const h = rect.height || 86;
+
+            if (!posObj) {
+                posObj = { x: fallbackX, y: fallbackY };
+            }
+
+            posObj.x = Math.max(8, Math.min(window.innerWidth - w - 8, posObj.x));
+            posObj.y = Math.max(64, Math.min(window.innerHeight - h - 12, posObj.y));
+
+            el.style.left = `${posObj.x}px`;
+            el.style.top = `${posObj.y}px`;
+            return posObj;
+        }
+
+        function makeElementDraggable(el, getPos, setPos, onQuickTap) {
+            let drag = { active: false, moved: false, startX: 0, startY: 0, origX: 0, origY: 0 };
+
+            el.addEventListener("pointerdown", (e) => {
+                if (e.button !== 0 && e.pointerType === "mouse") return;
+                drag.active = true;
+                drag.moved = false;
+                drag.startX = e.clientX;
+                drag.startY = e.clientY;
+                const current = getPos() || { x: el.offsetLeft, y: el.offsetTop };
+                drag.origX = current.x;
+                drag.origY = current.y;
+                try { el.setPointerCapture(e.pointerId); } catch (err) {}
+            });
+
+            el.addEventListener("pointermove", (e) => {
+                if (!drag.active) return;
+                const dx = e.clientX - drag.startX;
+                const dy = e.clientY - drag.startY;
+                if (!drag.moved && Math.hypot(dx, dy) > 5) {
+                    drag.moved = true;
+                    el.classList.add("dragging");
+                }
+                if (drag.moved) {
+                    const updated = clampAndApplyCoords(el, { x: drag.origX + dx, y: drag.origY + dy }, 28, window.innerHeight - 120);
+                    setPos(updated);
+                }
+            });
+
+            const finish = (e) => {
+                if (!drag.active) return;
+                drag.active = false;
+                el.classList.remove("dragging");
+                try { el.releasePointerCapture(e.pointerId); } catch (err) {}
+                if (drag.moved) {
+                    saveProgress();
+                } else if (onQuickTap) {
+                    onQuickTap();
+                }
+            };
+
+            el.addEventListener("pointerup", finish);
+            el.addEventListener("pointercancel", finish);
+        }
+
+        function renderEquippedPets() {
+            petsLayer.innerHTML = "";
+            state.equippedVariants.forEach((variantKey, idx) => {
+                const { petId, colorId } = parseVariantKey(variantKey);
+                const petItem = SHOP_CATALOG.find(i => i.id === petId);
+                const colorObj = (PET_COLOR_SWATCHES[petId] || []).find(c => c.id === colorId);
+                if (!petItem || !colorObj) return;
+
+                const entity = document.createElement("div");
+                entity.id = `pet-entity-${variantKey.replace(":", "-")}`;
+                entity.className = "draggable-pet-entity";
+                entity.title = `Drag ${colorObj.name} ${petItem.name} anywhere! Tap to chat.`;
+
+                const shortSpecies = petItem.name.replace(" Blob", "").replace("Red-Nosed ", "").replace("Chubby ", "");
+                entity.innerHTML = `
+                    <div class="pet-speech-bubble">Sqweek! ✨</div>
+                    <div class="pet-sprite-box pet-float">${getPetSVG(petId, colorId)}</div>
+                    <span class="pet-name-tag mono">${colorObj.name.split(" ")[0]} ${shortSpecies}</span>
+                `;
+
+                petsLayer.appendChild(entity);
+
+                const col = idx % 5;
+                const row = Math.floor(idx / 5);
+                const defaultX = 28 + col * 96;
+                const defaultY = Math.max(85, window.innerHeight - 175 - row * 95);
+                state.petPositions[variantKey] = clampAndApplyCoords(entity, state.petPositions[variantKey], defaultX, defaultY);
+
+                makeElementDraggable(
+                    entity,
+                    () => state.petPositions[variantKey],
+                    (pos) => { state.petPositions[variantKey] = pos; },
+                    () => {
+                        triggerPetReaction(variantKey);
+                        showPetNameTagTemporarily(variantKey);
+                    }
+                );
+            });
+        }
+
+        function renderCheesePlatter() {
+            cheeseItemsRow.innerHTML = "";
+            const entries = Object.entries(state.collectedCheeses).filter(([, count]) => count > 0);
+            if (entries.length === 0) {
+                cheesePlatterStage.classList.remove("has-cheese");
+                return;
+            }
+            cheesePlatterStage.classList.add("has-cheese");
+
+            entries.forEach(([cheeseId, count]) => {
+                const cheese = SILLY_CHEESES.find(c => c.id === cheeseId);
+                if (!cheese) return;
+
+                const chip = document.createElement("div");
+                chip.className = "cheese-chip";
+                chip.title = `${cheese.name} (x${count}) — Click to eat!`;
+                chip.innerHTML = `
+                    ${cheese.svg}
+                    ${count > 1 ? `<span class="cheese-count-badge">${count}</span>` : ""}
+                `;
+
+                chip.addEventListener("pointerdown", (e) => e.stopPropagation());
+                chip.addEventListener("click", (e) => {
+                    e.stopPropagation();
+                    eatCheese(cheeseId, e.clientX, e.clientY);
+                });
+
+                cheeseItemsRow.appendChild(chip);
+            });
+
+            requestAnimationFrame(() => {
+                let fallbackX = 28;
+                let fallbackY = Math.max(80, window.innerHeight - 72);
+                if (!state.platterPos && state.equippedVariants.length > 0) {
+                    const firstPos = state.petPositions[state.equippedVariants[0]];
+                    if (firstPos) {
+                        fallbackX = firstPos.x + 92;
+                        fallbackY = firstPos.y + 24;
+                    }
+                }
+                state.platterPos = clampAndApplyCoords(
+                    cheesePlatterStage,
+                    state.platterPos,
+                    fallbackX,
+                    fallbackY
+                );
+            });
+        }
+
+        makeElementDraggable(
+            cheesePlatterStage,
+            () => state.platterPos,
+            (pos) => { state.platterPos = pos; },
+            null
+        );
+
+        function awardRandomCheese() {
+            const randomCheese = SILLY_CHEESES[Math.floor(Math.random() * SILLY_CHEESES.length)];
+            state.collectedCheeses[randomCheese.id] = (state.collectedCheeses[randomCheese.id] || 0) + 1;
+            state.currentSession.cheesesWon += 1;
+            renderCheesePlatter();
+            soundEngine.playCheeseChime();
+            showToast(`🧀 5-Min Reward: ${randomCheese.name}! (Click to eat)`, true);
+            if (state.equippedVariants.length > 0) {
+                const luckyVariant = state.equippedVariants[Math.floor(Math.random() * state.equippedVariants.length)];
+                triggerPetReaction(luckyVariant, `Ooh, ${randomCheese.name}! Click it to eat! 🧀`);
+            }
+        }
+
+        /* =====================================================================
+           11. STUDY SESSION RECORDER & HISTORY LOG
+           ===================================================================== */
+        function resetCurrentSessionTracker() {
+            state.currentSession = {
+                startTime: Date.now(),
+                minutes: 0,
+                startElementIdx: state.currentIndex,
+                endElementIdx: state.currentIndex,
+                quantaEarned: 0,
+                cheesesWon: 0,
+                note: ""
+            };
+            if (activeSessionNoteInput) activeSessionNoteInput.value = "";
+            syncElementUI();
+        }
+
+        function recordCurrentSession(silent = false) {
+            const sess = state.currentSession;
+            if (sess.minutes < 1) {
+                if (!silent) showToast("Study at least 1 minute to log a session!");
+                return false;
+            }
+
+            const startEl = ELEMENTS[sess.startElementIdx] || ELEMENTS[0];
+            const endEl = ELEMENTS[sess.endElementIdx] || ELEMENTS[state.currentIndex];
+            const noteText = (activeSessionNoteInput.value || sess.note || "").trim();
+
+            const entry = {
+                id: `sess_${Date.now()}`,
+                timestamp: Date.now(),
+                durationMins: sess.minutes,
+                elementRange: `${startEl[1]} (${startEl[0]}) → ${endEl[1]} (${endEl[0]})`,
+                quantaEarned: sess.quantaEarned,
+                cheesesWon: sess.cheesesWon,
+                note: noteText
+            };
+
+            state.sessionHistory.unshift(entry);
+            resetCurrentSessionTracker();
+            saveProgress();
+            renderStudyLogDrawer();
+
+            if (!silent) {
+                showToast(`Session logged (${entry.durationMins} min) ✓`);
+            }
+            return true;
+        }
+
+        function formatSessionDate(ts) {
+            try {
+                const d = new Date(ts);
+                return d.toLocaleDateString(undefined, { month: "short", day: "numeric" }) +
+                    " · " + d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+            } catch (e) {
+                return "Recorded Session";
+            }
+        }
+
+        function renderStudyLogDrawer() {
+            const platterCheeses = Object.values(state.collectedCheeses).reduce((a, b) => a + b, 0);
+            const totalWonHistory = state.sessionHistory.reduce((acc, s) => acc + (s.cheesesWon || 0), 0) + state.currentSession.cheesesWon;
+            logTotalMins.textContent = state.minutesSpent.toLocaleString();
+            logTotalSessions.textContent = state.sessionHistory.length.toLocaleString();
+            logTotalCheeses.textContent = Math.max(platterCheeses, totalWonHistory).toLocaleString();
+
+            const sess = state.currentSession;
+            const sEl = ELEMENTS[sess.startElementIdx] || ELEMENTS[0];
+            const eEl = ELEMENTS[sess.endElementIdx] || ELEMENTS[state.currentIndex];
+            liveSessionStartLabel.textContent = `Started ${formatSessionDate(sess.startTime).split("·")[1] || "now"}`;
+            liveSessionStats.textContent = `${sess.minutes} min · ${sEl[1]} → ${eEl[1]} · +${sess.quantaEarned} ✦ · ${sess.cheesesWon} cheese${sess.cheesesWon === 1 ? "" : "s"}`;
+
+            sessionHistoryList.innerHTML = "";
+            if (state.sessionHistory.length === 0) {
+                sessionHistoryList.innerHTML = `
+                    <div style="text-align:center;padding:26px 14px;color:#64748b;font-size:12px;border:1px dashed rgba(148,163,184,0.2);border-radius:14px;">
+                        No recorded sessions yet. Study for 1+ minute and click <strong>✓ Log Session</strong> to save your progress here!
+                    </div>`;
+                return;
+            }
+
+            state.sessionHistory.forEach((item) => {
+                const card = document.createElement("div");
+                card.className = "session-log-card";
+                card.innerHTML = `
+                    <div class="session-log-top">
+                        <span class="session-date mono">${formatSessionDate(item.timestamp)}</span>
+                        <button class="delete-entry-btn" title="Delete session entry" aria-label="Delete session">
+                            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="session-badges mono">
+                        <span class="s-badge" style="color:#34d399;">◷ ${item.durationMins} min</span>
+                        <span class="s-badge" style="color:#38bdf8;">⚛ ${item.elementRange}</span>
+                        <span class="s-badge">+${item.quantaEarned} ✦</span>
+                        ${item.cheesesWon > 0 ? `<span class="s-badge" style="color:#fbbf24;">🧀 +${item.cheesesWon}</span>` : ""}
+                    </div>
+                    <div class="session-note-row">
+                        <input type="text" class="session-note-input" placeholder="Add subject tag or note..." value="${(item.note || "").replace(/"/g, "&quot;")}">
+                    </div>
+                `;
+
+                card.querySelector(".delete-entry-btn").addEventListener("click", () => {
+                    state.sessionHistory = state.sessionHistory.filter(s => s.id !== item.id);
+                    saveProgress();
+                    renderStudyLogDrawer();
+                });
+
+                card.querySelector(".session-note-input").addEventListener("change", (e) => {
+                    item.note = e.target.value.trim();
+                    saveProgress();
+                });
+
+                sessionHistoryList.appendChild(card);
+            });
+        }
+
+        window.addEventListener("beforeunload", () => {
+            if (state.currentSession.minutes >= 1) {
+                recordCurrentSession(true);
+            } else {
+                saveProgress();
+            }
+        });
+
+        /* =====================================================================
+           12. CANVAS & TIMER ENGINE
+           ===================================================================== */
+        let width = window.innerWidth;
+        let height = window.innerHeight;
+        let dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+        function resizeCanvas() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            dpr = Math.min(window.devicePixelRatio || 1, 2);
+            canvas.width = Math.floor(width * dpr);
+            canvas.height = Math.floor(height * dpr);
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            renderEquippedPets();
+            renderCheesePlatter();
+        }
+        window.addEventListener("resize", resizeCanvas);
+
+        function getActiveThemeBundle(categoryKey) {
+            const base = CATEGORY_THEMES[categoryKey] || CATEGORY_THEMES["nonmetal"];
+            const palette = RESONANCE_PALETTES[state.activeTheme] || RESONANCE_PALETTES["theme_default"];
+            return {
+                label: base.label,
+                primary: palette.primary || base.primary,
+                glow: palette.glow || base.glow,
+                voidBg: palette.voidBg,
+                nebulaTint: palette.nebulaTint
+            };
+        }
+
+        function syncElementUI() {
+            const el = ELEMENTS[state.currentIndex] || ELEMENTS[0];
+            const theme = getActiveThemeBundle(el[3]);
+            document.body.style.backgroundColor = theme.voidBg;
+            document.documentElement.style.setProperty("--accent", theme.primary);
+            categoryLabel.textContent = theme.label;
+            statusDot.style.backgroundColor = theme.primary;
+            shellsDisplay.textContent = el[4].join(" · ");
+            hudQuanta.textContent = state.quanta.toLocaleString();
+            hudMinutes.textContent = state.minutesSpent.toLocaleString();
+            hudSessionMins.textContent = `${state.currentSession.minutes}m`;
+            shopQuantaBalance.textContent = state.quanta.toLocaleString();
+            equippedCountBadge.textContent = `${state.equippedVariants.length} Equipped`;
+            state.transitionPulse = 1.0;
+        }
+
+        function setElementIndex(newIndex) {
+            const total = ELEMENTS.length;
+            state.currentIndex = ((newIndex % total) + total) % total;
+            state.elapsedMs = 0;
+            syncElementUI();
+            saveProgress();
+        }
+
+        function togglePlayPause() {
+            state.isPlaying = !state.isPlaying;
+            if (state.isPlaying) {
+                pauseIcon.classList.remove("hidden");
+                playIcon.classList.add("hidden");
+                statusDot.classList.add("pulse-dot");
+            } else {
+                pauseIcon.classList.add("hidden");
+                playIcon.classList.remove("hidden");
+                statusDot.classList.remove("pulse-dot");
+            }
+        }
+
+        function toggleSpeed() {
+            const ratio = state.elapsedMs / state.intervalMs;
+            if (state.intervalMs === 60000) {
+                state.intervalMs = 1000;
+                speedLabel.textContent = "1s / preview";
+                speedLabel.style.color = "#38bdf8";
+            } else {
+                state.intervalMs = 60000;
+                speedLabel.textContent = "60s / elem";
+                speedLabel.style.color = "";
+            }
+            state.elapsedMs = ratio * state.intervalMs;
+        }
+
+        function updateTimerDisplay() {
+            const remainingMs = Math.max(0, state.intervalMs - state.elapsedMs);
+            if (state.intervalMs >= 10000) {
+                const totalSec = Math.ceil(remainingMs / 1000);
+                const mins = Math.floor(totalSec / 60);
+                const secs = totalSec % 60;
+                timerText.textContent = `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+            } else {
+                timerText.textContent = `${(remainingMs / 1000).toFixed(1)}s`;
+            }
+        }
+
+        /* =====================================================================
+           13. SHOP (MULTI-PET + PER-PET COLOR SWATCHES) & STUDENT EDIT MODAL
+           ===================================================================== */
+        function closeAllDrawers() {
+            shopDrawer.classList.remove("open");
+            logDrawer.classList.remove("open");
+            drawerBackdrop.classList.remove("open");
+            setTimeout(() => {
+                if (!shopDrawer.classList.contains("open") && !logDrawer.classList.contains("open")) {
+                    drawerBackdrop.style.display = "none";
+                }
+            }, 250);
+        }
+
+        function openShop() {
+            closeAllDrawers();
+            renderShopItems();
+            drawerBackdrop.style.display = "block";
+            requestAnimationFrame(() => {
+                drawerBackdrop.classList.add("open");
+                shopDrawer.classList.add("open");
+            });
+        }
+
+        function openLogDrawer() {
+            closeAllDrawers();
+            renderStudyLogDrawer();
+            drawerBackdrop.style.display = "block";
+            requestAnimationFrame(() => {
+                drawerBackdrop.classList.add("open");
+                logDrawer.classList.add("open");
+            });
+        }
+
+        function handleShopAction(itemId) {
+            const item = SHOP_CATALOG.find(i => i.id === itemId);
+            if (!item) return;
+
+            if (item.type === "pet") {
+                const colorId = state.shopPreviewColor[item.id] || PET_COLOR_SWATCHES[item.id][0].id;
+                const variantKey = makeVariantKey(item.id, colorId);
+                const colorObj = PET_COLOR_SWATCHES[item.id].find(c => c.id === colorId);
+                const isUnlocked = state.unlockedItems.includes(variantKey);
+
+                if (!isUnlocked) {
+                    if (state.quanta < item.cost) {
+                        showToast(`Need ${item.cost - state.quanta} more Quanta ✦`);
+                        return;
+                    }
+                    state.quanta -= item.cost;
+                    state.unlockedItems.push(variantKey);
+                    showToast(`Unlocked ${colorObj.name} ${item.name}!`);
+                }
+
+                if (state.equippedVariants.includes(variantKey)) {
+                    state.equippedVariants = state.equippedVariants.filter(vk => vk !== variantKey);
+                } else {
+                    state.equippedVariants.push(variantKey);
+                }
+
+                renderEquippedPets();
+                if (state.equippedVariants.includes(variantKey)) {
+                    triggerPetReaction(variantKey, `${colorObj.name} reporting for duty! ✨`);
+                }
+                syncElementUI();
+                saveProgress();
+                renderShopItems();
+                return;
+            }
+
+            const isUnlocked = state.unlockedItems.includes(item.id);
+            if (!isUnlocked) {
+                if (state.quanta < item.cost) {
+                    showToast(`Need ${item.cost - state.quanta} more Quanta ✦`);
+                    return;
+                }
+                state.quanta -= item.cost;
+                state.unlockedItems.push(item.id);
+                showToast(`Unlocked: ${item.name}!`);
+            }
+
+            if (item.type === "upgrade") {
+                state.activeUpgrades[item.id] = !state.activeUpgrades[item.id];
+                if (item.id === "upg_chime" && state.activeUpgrades[item.id]) {
+                    soundEngine.playSingingBowl();
+                }
+                if (item.id === "upg_rain" && soundEngine.isPlaying) {
+                    soundEngine.stopAmbient();
+                    soundEngine.startAmbient();
+                }
+            } else if (item.type === "theme") {
+                state.activeTheme = item.id;
+            }
+
+            syncElementUI();
+            saveProgress();
+            renderShopItems();
+        }
+
+        function selectPetColor(petId, colorId) {
+            state.shopPreviewColor[petId] = colorId;
+            saveProgress();
+            renderShopItems();
+        }
+
+        function renderShopItems() {
+            shopQuantaBalance.textContent = state.quanta.toLocaleString();
+            equippedCountBadge.textContent = `${state.equippedVariants.length} Equipped`;
+            shopPetsList.innerHTML = "";
+            shopUpgradesList.innerHTML = "";
+            shopThemesList.innerHTML = "";
+
+            SHOP_CATALOG.forEach(item => {
+                if (item.type === "pet") {
+                    const swatches = PET_COLOR_SWATCHES[item.id] || [];
+                    const previewColorId = state.shopPreviewColor[item.id] || swatches[0].id;
+                    const previewColorObj = swatches.find(s => s.id === previewColorId) || swatches[0];
+                    const variantKey = makeVariantKey(item.id, previewColorId);
+
+                    const isVariantUnlocked = state.unlockedItems.includes(variantKey);
+                    const isVariantEquipped = state.equippedVariants.includes(variantKey);
+                    const canAfford = state.quanta >= item.cost;
+
+                    const ownedCount = swatches.filter(s => state.unlockedItems.includes(makeVariantKey(item.id, s.id))).length;
+                    const equippedCount = swatches.filter(s => state.equippedVariants.includes(makeVariantKey(item.id, s.id))).length;
+
+                    const card = document.createElement("div");
+                    card.className = `shop-card ${equippedCount > 0 ? "active-card" : ""}`;
+
+                    let btnText = `Unlock ${previewColorObj.name.split(" ")[0]} · ✦${item.cost}`;
+                    let btnClass = canAfford ? "buy" : "locked";
+                    if (isVariantUnlocked) {
+                        btnText = isVariantEquipped ? "Equipped ✓" : `Equip ${previewColorObj.name.split(" ")[0]}`;
+                        btnClass = isVariantEquipped ? "equipped" : "equip";
+                    }
+
+                    const topRow = document.createElement("div");
+                    topRow.className = "shop-card-top";
+                    topRow.innerHTML = `
+                        <div class="shop-card-left">
+                            <div class="shop-pet-thumb">${getPetSVG(item.id, previewColorId)}</div>
+                            <div>
+                                <div class="shop-item-title">
+                                    ${item.name}
+                                    ${ownedCount > 0 ? `<span class="mono" style="font-size:10px;color:#38bdf8;margin-left:5px;">(${ownedCount}/8 owned)</span>` : ""}
+                                </div>
+                                <div class="shop-item-desc">${item.desc}</div>
+                            </div>
+                        </div>
+                        <button class="shop-action-btn mono ${btnClass}">${btnText}</button>
+                    `;
+                    topRow.querySelector("button").addEventListener("click", () => handleShopAction(item.id));
+                    card.appendChild(topRow);
+
+                    const bar = document.createElement("div");
+                    bar.className = "pet-swatches-bar";
+
+                    const lbl = document.createElement("span");
+                    lbl.className = "swatch-label mono";
+                    lbl.textContent = item.id === "pet_reindeer" ? "Nose Variant:" : "Color Variant:";
+                    bar.appendChild(lbl);
+
+                    swatches.forEach(sw => {
+                        const vk = makeVariantKey(item.id, sw.id);
+                        const dotOwned = state.unlockedItems.includes(vk);
+                        const dotEquipped = state.equippedVariants.includes(vk);
+
+                        const dot = document.createElement("button");
+                        dot.type = "button";
+                        dot.className = `pet-color-dot ${previewColorId === sw.id ? "selected" : ""} ${dotOwned ? "owned" : ""} ${dotEquipped ? "equipped-dot" : ""}`;
+                        dot.style.backgroundColor = sw.swatch;
+                        dot.title = `${sw.name}${dotEquipped ? " (Equipped)" : dotOwned ? " (Owned)" : ` (✦ ${item.cost})`}`;
+                        dot.setAttribute("aria-label", sw.name);
+                        dot.addEventListener("click", (e) => {
+                            e.stopPropagation();
+                            selectPetColor(item.id, sw.id);
+                        });
+                        bar.appendChild(dot);
+                    });
+
+                    card.appendChild(bar);
+                    shopPetsList.appendChild(card);
+                    return;
+                }
+
+                const isUnlocked = state.unlockedItems.includes(item.id);
+                let isEquipped = false;
+                if (item.type === "upgrade") isEquipped = !!state.activeUpgrades[item.id];
+                if (item.type === "theme") isEquipped = state.activeTheme === item.id;
+
+                const canAfford = state.quanta >= item.cost;
+
+                const card = document.createElement("div");
+                card.className = `shop-card ${isEquipped ? "active-card" : ""}`;
+
+                let btnText = `✦ ${item.cost}`;
+                let btnClass = canAfford ? "buy" : "locked";
+                if (isUnlocked) {
+                    btnText = isEquipped ? "Equipped ✓" : "Equip";
+                    btnClass = isEquipped ? "equipped" : "equip";
+                }
+
+                let leftVisual = "";
+                if (item.type === "theme") {
+                    const pal = RESONANCE_PALETTES[item.id];
+                    leftVisual = `<div class="theme-swatch" style="background:${pal ? pal.swatch : '#38bdf8'};"></div>`;
+                }
+
+                const topRow = document.createElement("div");
+                topRow.className = "shop-card-top";
+                topRow.innerHTML = `
+                    <div class="shop-card-left">
+                        ${leftVisual}
+                        <div>
+                            <div class="shop-item-title">${item.name}</div>
+                            <div class="shop-item-desc">${item.desc}</div>
+                        </div>
+                    </div>
+                    <button class="shop-action-btn mono ${btnClass}">${btnText}</button>
+                `;
+                topRow.querySelector("button").addEventListener("click", () => handleShopAction(item.id));
+                card.appendChild(topRow);
+
+                if (item.type === "upgrade") shopUpgradesList.appendChild(card);
+                else shopThemesList.appendChild(card);
+            });
+        }
+
+        // Student Edit & Recovery Modal
+        function populateElementDropdown() {
+            editElementSelect.innerHTML = "";
+            ELEMENTS.forEach((el, idx) => {
+                const opt = document.createElement("option");
+                opt.value = idx;
+                opt.textContent = `${el[0]}. ${el[2]} (${el[1]})`;
+                editElementSelect.appendChild(opt);
+            });
+        }
+
+        function openEditModal() {
+            editMinutesInput.value = state.minutesSpent;
+            editQuantaInput.value = state.quanta;
+            editElementSelect.value = state.currentIndex;
+            syncElementWithMinutes.checked = false;
+
+            editUnlocksGrid.innerHTML = "";
+            SHOP_CATALOG.filter(i => i.cost > 0).forEach(item => {
+                if (item.type === "pet") {
+                    const swatches = PET_COLOR_SWATCHES[item.id] || [];
+                    const anyOwned = swatches.some(s => state.unlockedItems.includes(makeVariantKey(item.id, s.id)));
+                    const label = document.createElement("label");
+                    label.className = "unlock-check-card";
+                    label.innerHTML = `
+                        <input type="checkbox" data-pet-species-id="${item.id}" ${anyOwned ? "checked" : ""}>
+                        <span>${item.name} (All 8 Colors)</span>
+                    `;
+                    editUnlocksGrid.appendChild(label);
+                } else {
+                    const checked = state.unlockedItems.includes(item.id);
+                    const label = document.createElement("label");
+                    label.className = "unlock-check-card";
+                    label.innerHTML = `
+                        <input type="checkbox" data-unlock-id="${item.id}" ${checked ? "checked" : ""}>
+                        <span>${item.name}</span>
+                    `;
+                    editUnlocksGrid.appendChild(label);
+                }
+            });
+
+            editModal.classList.add("open");
+        }
+
+        function closeEditModal() {
+            editModal.classList.remove("open");
+        }
+
+        addRandomCheeseRecoveryBtn.addEventListener("click", () => {
+            const randomCheese = SILLY_CHEESES[Math.floor(Math.random() * SILLY_CHEESES.length)];
+            state.collectedCheeses[randomCheese.id] = (state.collectedCheeses[randomCheese.id] || 0) + 1;
+            renderCheesePlatter();
+            saveProgress();
+            showToast(`Added ${randomCheese.name} to platter 🧀`, true);
+        });
+
+        clearCheesesRecoveryBtn.addEventListener("click", () => {
+            state.collectedCheeses = {};
+            renderCheesePlatter();
+            saveProgress();
+            showToast("Cheese platter cleared");
+        });
+
+        saveEditBtn.addEventListener("click", () => {
+            const newMins = Math.max(0, parseInt(editMinutesInput.value, 10) || 0);
+            const newQuanta = Math.max(0, parseInt(editQuantaInput.value, 10) || 0);
+            let newIndex = parseInt(editElementSelect.value, 10) || 0;
+
+            if (syncElementWithMinutes.checked) {
+                newIndex = newMins % ELEMENTS.length;
+            }
+
+            const updatedUnlocks = ["theme_default"];
+            editUnlocksGrid.querySelectorAll("input[data-unlock-id]").forEach(cb => {
+                if (cb.checked) updatedUnlocks.push(cb.dataset.unlockId);
+            });
+            editUnlocksGrid.querySelectorAll("input[data-pet-species-id]").forEach(cb => {
+                const petId = cb.dataset.petSpeciesId;
+                const swatches = PET_COLOR_SWATCHES[petId] || [];
+                if (cb.checked) {
+                    swatches.forEach(s => updatedUnlocks.push(makeVariantKey(petId, s.id)));
+                }
+            });
+
+            state.minutesSpent = newMins;
+            state.quanta = newQuanta;
+            state.currentIndex = newIndex;
+            state.elapsedMs = 0;
+            state.unlockedItems = updatedUnlocks;
+
+            state.equippedVariants = state.equippedVariants.filter(vk => updatedUnlocks.includes(vk));
+            if (!updatedUnlocks.includes(state.activeTheme)) {
+                state.activeTheme = "theme_default";
+            }
+
+            renderEquippedPets();
+            renderCheesePlatter();
+            syncElementUI();
+            saveProgress();
+            closeEditModal();
+            showToast("Study progress restored & saved ✓");
+        });
+
+        factoryResetBtn.addEventListener("click", () => {
+            state.currentIndex = 0;
+            state.minutesSpent = 0;
+            state.quanta = 15;
+            state.elapsedMs = 0;
+            state.unlockedItems = ["theme_default"];
+            state.equippedVariants = [];
+            state.petPositions = {};
+            state.platterPos = null;
+            state.activeTheme = "theme_default";
+            state.activeUpgrades = { upg_starfield: false, upg_trails: false, upg_chime: false, upg_rain: false };
+            state.collectedCheeses = {};
+            state.sessionHistory = [];
+            resetCurrentSessionTracker();
+            renderEquippedPets();
+            renderCheesePlatter();
+            syncElementUI();
+            saveProgress();
+            closeEditModal();
+            showToast("All progress reset to Hydrogen (H) · 0 pets");
+        });
+
+        /* =====================================================================
+           14. EVENT BINDINGS
+           ===================================================================== */
+        prevBtn.addEventListener("click", (e) => { e.stopPropagation(); setElementIndex(state.currentIndex - 1); });
+        nextBtn.addEventListener("click", (e) => { e.stopPropagation(); setElementIndex(state.currentIndex + 1); });
+        playPauseBtn.addEventListener("click", (e) => { e.stopPropagation(); togglePlayPause(); });
+        speedBtn.addEventListener("click", (e) => { e.stopPropagation(); toggleSpeed(); });
+
+        logSessionDockBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            recordCurrentSession(false);
+        });
+
+        drawerLogSessionBtn.addEventListener("click", () => {
+            recordCurrentSession(false);
+        });
+
+        clearHistoryBtn.addEventListener("click", () => {
+            state.sessionHistory = [];
+            saveProgress();
+            renderStudyLogDrawer();
+            showToast("Recorded session history cleared");
+        });
+
+        resetSessionBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            if (state.currentSession.minutes >= 1) {
+                recordCurrentSession(true);
+                showToast("Previous session logged & atom reset to H");
+            } else {
+                showToast("Session atom reset to Hydrogen (H)");
+            }
+            setElementIndex(0);
+            resetCurrentSessionTracker();
+        });
+
+        audioToggleBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            const active = soundEngine.toggleAmbient();
+            audioMutedIcon.classList.toggle("hidden", active);
+            audioOnIcon.classList.toggle("hidden", !active);
+            if (active) showToast("Ambient study soundscape active");
+        });
+
+        openShopBtn.addEventListener("click", openShop);
+        closeShopBtn.addEventListener("click", closeAllDrawers);
+        openLogBtn.addEventListener("click", openLogDrawer);
+        closeLogBtn.addEventListener("click", closeAllDrawers);
+        drawerBackdrop.addEventListener("click", closeAllDrawers);
+
+        openEditBtn.addEventListener("click", openEditModal);
+        closeEditBtn.addEventListener("click", closeEditModal);
+        cancelEditBtn.addEventListener("click", closeEditModal);
+
+        window.addEventListener("keydown", (e) => {
+            if (editModal.classList.contains("open")) {
+                if (e.key === "Escape") closeEditModal();
+                return;
+            }
+            if (shopDrawer.classList.contains("open") || logDrawer.classList.contains("open")) {
+                if (e.key === "Escape") closeAllDrawers();
+                return;
+            }
+            if (document.activeElement && document.activeElement.tagName === "INPUT") return;
+
+            if (e.code === "Space") {
+                e.preventDefault();
+                togglePlayPause();
+            } else if (e.code === "ArrowRight") {
+                setElementIndex(state.currentIndex + 1);
+            } else if (e.code === "ArrowLeft") {
+                setElementIndex(state.currentIndex - 1);
+            }
+        });
+
+        window.addEventListener("pointermove", (e) => {
+            const nx = (e.clientX / width) * 2 - 1;
+            const ny = (e.clientY / height) * 2 - 1;
+            state.targetTiltX = nx * 10;
+            state.targetTiltY = ny * 10;
+        });
+
+        window.addEventListener("pointerleave", () => {
+            state.targetTiltX = 0;
+            state.targetTiltY = 0;
+        });
+
+        /* =====================================================================
+           15. MAIN RENDER & STUDY MINUTE LOOP (+5 BASE +2 BONUS = +7 QUANTA/MIN)
+           ===================================================================== */
+        function render(timestamp) {
+            if (!state.lastFrameTime) state.lastFrameTime = timestamp;
+            const dt = Math.min(timestamp - state.lastFrameTime, 100);
+            state.lastFrameTime = timestamp;
+
+            if (state.isPlaying) {
+                state.elapsedMs += dt;
+                if (state.elapsedMs >= state.intervalMs) {
+                    state.elapsedMs %= state.intervalMs;
+                    state.currentIndex = (state.currentIndex + 1) % ELEMENTS.length;
+
+                    // Motivating economy: 5 base Quanta + 2 discovery bonus = +7 Quanta per minute
+                    const earnedThisMin = 7;
+                    state.minutesSpent += 1;
+                    state.quanta += earnedThisMin;
+
+                    state.currentSession.minutes += 1;
+                    state.currentSession.endElementIdx = state.currentIndex;
+                    state.currentSession.quantaEarned += earnedThisMin;
+
+                    const discovered = ELEMENTS[state.currentIndex];
+                    syncElementUI();
+
+                    // Award 1 random silly edible cheese every 5 study minutes!
+                    if (state.minutesSpent % 5 === 0) {
+                        awardRandomCheese();
+                    } else if (state.equippedVariants.length > 0) {
+                        const speakerVariant = state.equippedVariants[Math.floor(Math.random() * state.equippedVariants.length)];
+                        triggerPetReaction(speakerVariant, `Discovered ${discovered[2]} (${discovered[1]})! ⚛️`);
+                    }
+
+                    if (state.activeUpgrades.upg_chime) {
+                        soundEngine.playSingingBowl();
+                    }
+
+                    if (logDrawer.classList.contains("open")) {
+                        renderStudyLogDrawer();
+                    }
+
+                    saveProgress();
+                }
+            }
+
+            updateTimerDisplay();
+
+            state.transitionPulse *= Math.pow(0.04, dt / 1000);
+            state.tiltX += (state.targetTiltX - state.tiltX) * 0.08;
+            state.tiltY += (state.targetTiltY - state.tiltY) * 0.08;
+
+            const currentElement = ELEMENTS[state.currentIndex] || ELEMENTS[0];
+            const [atomicNumber, symbol, name, category, shells] = currentElement;
+            const theme = getActiveThemeBundle(category);
+
+            // Theme-tinted Obsidian Void Backdrop
+            ctx.fillStyle = theme.voidBg;
+            ctx.fillRect(0, 0, width, height);
+
+            const cx = width / 2 + state.tiltX * 0.4;
+            const cy = height / 2 + state.tiltY * 0.4;
+            const minDim = Math.min(width, height);
+            const timeSec = timestamp * 0.001;
+
+            // Optional Starfield Upgrade
+            if (state.activeUpgrades.upg_starfield) {
+                for (let i = 0; i < stars.length; i++) {
+                    const st = stars[i];
+                    const sx = ((st.x + timeSec * st.speed * 0.15) % 1) * width;
+                    const sy = st.y * height;
+                    const alpha = 0.25 + 0.45 * Math.sin(timeSec * 1.4 + st.phase);
+                    ctx.fillStyle = `rgba(226, 232, 240, ${alpha.toFixed(3)})`;
+                    ctx.beginPath();
+                    ctx.arc(sx, sy, st.size, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+
+            // Ambient Theme Nebula Glow
+            const ambientRadius = minDim * 0.48;
+            const bgGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, ambientRadius);
+            bgGrad.addColorStop(0, theme.glow.replace("0.55", "0.18"));
+            bgGrad.addColorStop(0.55, theme.nebulaTint);
+            bgGrad.addColorStop(1, "rgba(3, 4, 7, 0)");
+            ctx.fillStyle = bgGrad;
+            ctx.fillRect(0, 0, width, height);
+
+            // Concentric Electron Shells
+            const numShells = shells.length;
+            const maxAtomRadius = minDim * 0.41;
+            const nucleusRadius = Math.max(34, Math.min(54, minDim * 0.072));
+            const innerClearance = nucleusRadius + Math.max(20, minDim * 0.032);
+            const availableSpan = Math.max(40, maxAtomRadius - innerClearance);
+            const shellStep = numShells > 1 ? availableSpan / (numShells - 0.55) : availableSpan * 0.52;
+
+            for (let s = 0; s < numShells; s++) {
+                const electronCount = shells[s];
+                const radius = innerClearance + s * shellStep;
+
+                const direction = s % 2 === 0 ? 1 : -1;
+                const baseSpeed = (0.72 / Math.pow(s + 1, 0.62)) * direction;
+                const shellAngleOffset = timeSec * baseSpeed + s * 0.85;
+
+                const tiltFactor = 1 - 0.035 * Math.sin(timeSec * 0.7 + s * 1.1);
+                const rx = radius + state.transitionPulse * 6;
+                const ry = radius * tiltFactor + state.transitionPulse * 6;
+
+                ctx.save();
+                ctx.translate(cx, cy);
+                ctx.rotate(Math.sin(timeSec * 0.25 + s) * 0.08);
+
+                ctx.beginPath();
+                ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
+                ctx.strokeStyle = "rgba(148, 163, 184, 0.14)";
+                ctx.lineWidth = 1.15;
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.ellipse(0, 0, rx, ry, 0, shellAngleOffset, shellAngleOffset + Math.PI * 0.65);
+                ctx.strokeStyle = theme.glow.replace("0.55", "0.28");
+                ctx.lineWidth = 1.6;
+                ctx.stroke();
+
+                const electronSize = Math.max(2.6, Math.min(4.2, minDim * 0.0052));
+                const trailMult = state.activeUpgrades.upg_trails ? 0.68 : 0.26;
+
+                for (let e = 0; e < electronCount; e++) {
+                    const theta = shellAngleOffset + (e * Math.PI * 2) / electronCount;
+                    const ex = Math.cos(theta) * rx;
+                    const ey = Math.sin(theta) * ry;
+
+                    const trailLength = trailMult * direction;
+                    ctx.beginPath();
+                    ctx.ellipse(0, 0, rx, ry, 0, theta - trailLength, theta, direction < 0);
+                    ctx.strokeStyle = theme.glow.replace("0.55", state.activeUpgrades.upg_trails ? "0.65" : "0.45");
+                    ctx.lineWidth = electronSize * (state.activeUpgrades.upg_trails ? 1.15 : 0.85);
+                    ctx.lineCap = "round";
+                    ctx.stroke();
+
+                    const eGlow = ctx.createRadialGradient(ex, ey, 0, ex, ey, electronSize * 3.4);
+                    eGlow.addColorStop(0, theme.primary);
+                    eGlow.addColorStop(0.4, theme.glow);
+                    eGlow.addColorStop(1, "rgba(0, 0, 0, 0)");
+                    ctx.fillStyle = eGlow;
+                    ctx.beginPath();
+                    ctx.arc(ex, ey, electronSize * 3.4, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.fillStyle = "#ffffff";
+                    ctx.beginPath();
+                    ctx.arc(ex, ey, electronSize, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                ctx.restore();
+            }
+
+            // Central Nucleus
+            ctx.save();
+            ctx.translate(cx - state.tiltX * 0.25, cy - state.tiltY * 0.25);
+
+            const pulseScale = 1 + Math.sin(timeSec * 2.4) * 0.025 + state.transitionPulse * 0.14;
+            const nRad = nucleusRadius * pulseScale;
+
+            const auraGrad = ctx.createRadialGradient(0, 0, nRad * 0.6, 0, 0, nRad * 2.1);
+            auraGrad.addColorStop(0, theme.glow);
+            auraGrad.addColorStop(1, "rgba(3, 4, 7, 0)");
+            ctx.fillStyle = auraGrad;
+            ctx.beginPath();
+            ctx.arc(0, 0, nRad * 2.1, 0, Math.PI * 2);
+            ctx.fill();
+
+            const coreGrad = ctx.createRadialGradient(-nRad * 0.28, -nRad * 0.28, nRad * 0.1, 0, 0, nRad);
+            coreGrad.addColorStop(0, "#1e293b");
+            coreGrad.addColorStop(0.75, "#090d16");
+            coreGrad.addColorStop(1, theme.voidBg);
+            ctx.fillStyle = coreGrad;
+            ctx.beginPath();
+            ctx.arc(0, 0, nRad, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.14)";
+            ctx.lineWidth = 1.25;
+            ctx.stroke();
+
+            // 60-Second Countdown Progress Ring
+            const progress = Math.min(1, state.elapsedMs / state.intervalMs);
+            const startAngle = -Math.PI / 2;
+            const endAngle = startAngle + progress * Math.PI * 2;
+
+            ctx.beginPath();
+            ctx.arc(0, 0, nRad + 4.5, 0, Math.PI * 2);
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.06)";
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            if (progress > 0.002) {
+                ctx.beginPath();
+                ctx.arc(0, 0, nRad + 4.5, startAngle, endAngle);
+                ctx.strokeStyle = theme.primary;
+                ctx.lineWidth = 2.2;
+                ctx.lineCap = "round";
+                ctx.stroke();
+            }
+
+            // Nucleus Typography
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+
+            const numFontSize = Math.max(10, Math.round(nRad * 0.24));
+            ctx.font = `500 ${numFontSize}px ui-monospace, SFMono-Regular, Menlo, monospace`;
+            ctx.fillStyle = theme.primary;
+            ctx.fillText(String(atomicNumber), 0, -nRad * 0.48);
+
+            const symFontSize = Math.max(18, Math.round(nRad * 0.56));
+            ctx.font = `700 ${symFontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+            ctx.fillStyle = "#ffffff";
+            ctx.shadowColor = theme.glow;
+            ctx.shadowBlur = 12;
+            ctx.fillText(symbol, 0, 2);
+            ctx.shadowBlur = 0;
+
+            const nameFontSize = Math.max(8, Math.round(nRad * 0.19));
+            ctx.font = `500 ${nameFontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+            ctx.fillStyle = "rgba(226, 232, 240, 0.82)";
+            ctx.fillText(name, 0, nRad * 0.50);
+
+            ctx.restore();
+
+            requestAnimationFrame(render);
+        }
+
+        function initApp() {
+            try {
+                loadProgress();
+                state.currentSession.startElementIdx = state.currentIndex;
+                state.currentSession.endElementIdx = state.currentIndex;
+                populateElementDropdown();
+                resizeCanvas();
+                renderEquippedPets();
+                renderCheesePlatter();
+                syncElementUI();
+                requestAnimationFrame(render);
+            } catch (err) {
+                console.error("Study timer init recovery:", err);
+                try {
+                    localStorage.removeItem(STORAGE_KEY);
+                } catch (e) {}
+                populateElementDropdown();
+                resizeCanvas();
+                syncElementUI();
+                requestAnimationFrame(render);
+            }
+        }
+
+        if (document.readyState === "loading") {
+            document.addEventListener("DOMContentLoaded", initApp);
+        } else {
+            initApp();
+        }
+    </script>
+</body>
+</html>
